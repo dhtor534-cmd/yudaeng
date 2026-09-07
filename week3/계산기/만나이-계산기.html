@@ -1,0 +1,333 @@
+<title>만 나이 계산기</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root{
+    --paper:#F5F3ED;
+    --surface:#FCFBF8;
+    --surface-2:#EFEBE1;
+    --line:#E3DFD3;
+    --ink:#22262C;
+    --ink-soft:#5C616A;
+    --seal:#BB4231;
+    --jade:#3A7B6A;
+    --shadow:0 1px 2px rgba(34,38,44,.04),0 12px 32px -12px rgba(34,38,44,.14);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#15171A;
+      --surface:#1E2125;
+      --surface-2:#262A2E;
+      --line:#2F3439;
+      --ink:#EAE8E1;
+      --ink-soft:#969CA2;
+      --seal:#E4715D;
+      --jade:#77B9A6;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#15171A;
+    --surface:#1E2125;
+    --surface-2:#262A2E;
+    --line:#2F3439;
+    --ink:#EAE8E1;
+    --ink-soft:#969CA2;
+    --seal:#E4715D;
+    --jade:#77B9A6;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:"Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{
+    max-width:592px;
+    margin:0 auto;
+    padding:clamp(28px,7vw,64px) 20px 72px;
+  }
+
+  header{display:flex;align-items:center;gap:14px;margin-bottom:30px}
+  .seal{
+    flex:none;width:46px;height:46px;border:2px solid var(--seal);border-radius:7px;
+    display:grid;place-items:center;
+    font-family:"Nanum Myeongjo",serif;font-weight:800;font-size:1.4rem;color:var(--seal);
+    line-height:1;
+  }
+  .eyebrow{
+    font-size:.7rem;font-weight:700;letter-spacing:.22em;color:var(--ink-soft);
+    text-transform:uppercase;margin:0 0 2px;
+  }
+  h1{
+    font-family:"Nanum Myeongjo",serif;font-weight:800;
+    font-size:clamp(1.6rem,5.5vw,2.1rem);line-height:1.2;margin:0;
+    text-wrap:balance;letter-spacing:-.01em;
+  }
+
+  .lede{
+    color:var(--ink-soft);font-size:.92rem;margin:0 0 26px;max-width:52ch;
+  }
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);
+  }
+
+  form{padding:20px;margin-bottom:20px}
+  .fields{display:grid;grid-template-columns:1fr;gap:16px}
+  @media (min-width:430px){.fields{grid-template-columns:1fr 1fr}}
+  .field{display:flex;flex-direction:column;gap:7px}
+  .field-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+  label{
+    font-size:.72rem;font-weight:700;letter-spacing:.14em;color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  .today-btn{
+    background:none;border:none;padding:0;cursor:pointer;
+    font-family:inherit;font-size:.74rem;color:var(--jade);font-weight:500;
+    border-bottom:1px solid color-mix(in srgb,var(--jade) 40%,transparent);
+  }
+  .today-btn:hover{border-bottom-color:var(--jade)}
+  input[type="date"]{
+    font-family:"IBM Plex Mono","Noto Sans KR",monospace;
+    font-size:1rem;color:var(--ink);
+    background:var(--paper);border:1px solid var(--line);border-radius:8px;
+    padding:10px 12px;width:100%;
+    -webkit-appearance:none;appearance:none;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
+  input:focus-visible,.today-btn:focus-visible{
+    outline:2px solid var(--seal);outline-offset:2px;
+  }
+  .hint{font-size:.76rem;color:var(--ink-soft);margin:12px 0 0}
+
+  /* result */
+  .result{padding:22px 20px 20px;overflow:hidden}
+  .result-top{border-top:3px solid var(--seal);margin:-22px -20px 18px;padding:14px 20px 0}
+  .r-label{
+    font-size:.72rem;font-weight:700;letter-spacing:.16em;color:var(--ink-soft);
+    text-transform:uppercase;margin:0 0 4px;
+  }
+  .r-age{
+    font-family:"Nanum Myeongjo",serif;font-weight:800;color:var(--seal);
+    font-size:clamp(2.6rem,11vw,3.5rem);line-height:1;letter-spacing:-.02em;
+    display:flex;align-items:baseline;gap:.12em;
+  }
+  .r-age .unit{font-size:.42em;font-weight:700;color:var(--ink)}
+  .r-precise{
+    font-family:"IBM Plex Mono",monospace;font-size:.9rem;color:var(--ink-soft);
+    margin:10px 0 0;
+  }
+  .r-precise[hidden]{display:none}
+
+  .meta{
+    display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:18px;padding-top:16px;
+    border-top:1px solid var(--line);
+  }
+  .meta div{display:flex;flex-direction:column;gap:1px}
+  .meta dt{
+    font-size:.68rem;font-weight:700;letter-spacing:.12em;color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  .meta dd{
+    margin:0;font-family:"IBM Plex Mono",monospace;font-size:.92rem;color:var(--ink);
+    font-variant-numeric:tabular-nums;
+  }
+  .dday{color:var(--jade);font-weight:500}
+
+  .error{color:var(--seal);font-size:.9rem;margin:4px 0 0}
+
+  /* comparison */
+  .compare{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  .chip{
+    background:var(--surface-2);border-radius:10px;padding:14px 15px;
+  }
+  .chip h3{
+    margin:0;font-size:.74rem;font-weight:700;letter-spacing:.1em;color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  .chip .v{
+    font-family:"Nanum Myeongjo",serif;font-weight:700;font-size:1.7rem;color:var(--ink);
+    line-height:1.1;margin:6px 0 5px;
+  }
+  .chip p{margin:0;font-size:.76rem;color:var(--ink-soft);line-height:1.55}
+
+  footer{margin-top:26px;font-size:.8rem;color:var(--ink-soft);line-height:1.65}
+  footer p{margin:0 0 8px}
+  footer b{color:var(--ink);font-weight:700}
+  footer .rule{width:34px;height:2px;background:var(--seal);margin:0 0 14px;border:0}
+
+  @media (prefers-reduced-motion:no-preference){
+    .r-age,.chip .v,.meta dd{transition:color .2s ease}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="seal" aria-hidden="true">만</div>
+    <div>
+      <p class="eyebrow">Korean Age</p>
+      <h1>만 나이 계산기</h1>
+    </div>
+  </header>
+
+  <p class="lede">생년월일과 기준일을 넣으면 만 나이를 계산합니다. 2023년 6월 28일부터 법령·행정·계약상 나이는 모두 만 나이로 통일됐습니다.</p>
+
+  <form class="card" id="form" autocomplete="off">
+    <div class="fields">
+      <div class="field">
+        <div class="field-head"><label for="birth">생년월일</label></div>
+        <input type="date" id="birth" value="1992-03-15" max="2026-09-03">
+      </div>
+      <div class="field">
+        <div class="field-head">
+          <label for="ref">기준일</label>
+          <button type="button" class="today-btn" id="todayBtn">오늘로</button>
+        </div>
+        <input type="date" id="ref" value="2026-09-03">
+      </div>
+    </div>
+    <p class="hint" id="hint">예시로 1992년 3월 15일이 들어가 있어요. 본인 생년월일로 바꿔보세요.</p>
+  </form>
+
+  <section class="card result" id="result" aria-live="polite">
+    <div class="result-top">
+      <p class="r-label">만 나이</p>
+    </div>
+    <div class="r-age" id="ageMain">만 34<span class="unit">세</span></div>
+    <p class="r-precise" id="agePrecise">34세 5개월 19일</p>
+    <p class="error" id="errMsg" hidden></p>
+
+    <dl class="meta" id="meta">
+      <div>
+        <dt>다음 생일</dt>
+        <dd><span class="dday" id="ddayVal">D-193</span> · <span id="nextDate">2027. 3. 15. (월)</span></dd>
+      </div>
+      <div>
+        <dt>세상에 나온 지</dt>
+        <dd id="livedVal">12,591일</dd>
+      </div>
+    </dl>
+  </section>
+
+  <div class="compare">
+    <div class="chip">
+      <h3>세는 나이</h3>
+      <div class="v" id="korAge">35세</div>
+      <p>옛 한국식 나이. 태어나면 1살, 해가 바뀌면 다 같이 +1살.</p>
+    </div>
+    <div class="chip">
+      <h3>연 나이</h3>
+      <div class="v" id="yearAge">34세</div>
+      <p>올해 − 태어난 해. 병역법·청소년보호법 등 일부 법률이 지금도 사용.</p>
+    </div>
+  </div>
+
+  <footer>
+    <hr class="rule">
+    <p><b>만 나이란?</b> 태어난 날을 기준으로 0살에서 시작해, 생일이 지날 때마다 한 살씩 더하는 방식입니다. 국제적으로 통용되는 나이 계산법과 같습니다.</p>
+    <p>특별한 규정이 없으면 법령·계약서·공문서의 '나이'는 만 나이를 뜻합니다. 초·중등 취학 연령, 일부 세금·연금 기준 등은 별도 규정을 따르므로 해당 기관에 확인하세요.</p>
+  </footer>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const birthEl = $('birth'), refEl = $('ref');
+  const WD = ['일','월','화','수','목','금','토'];
+  const nf = new Intl.NumberFormat('ko-KR');
+
+  // keep example inputs current: default ref = today, birth max = today
+  (function initToday(){
+    const t = new Date();
+    const iso = t.getFullYear() + '-' + String(t.getMonth()+1).padStart(2,'0') + '-' + String(t.getDate()).padStart(2,'0');
+    birthEl.max = iso;
+    if (!refEl.value) refEl.value = iso;
+    refEl.dataset.today = iso;
+  })();
+
+  function ymd(str){
+    const p = str.split('-').map(Number);
+    if (p.length !== 3 || p.some(isNaN)) return null;
+    const d = new Date(p[0], p[1]-1, p[2]);
+    if (d.getFullYear() !== p[0] || d.getMonth() !== p[1]-1 || d.getDate() !== p[2]) return null;
+    return d;
+  }
+  // birthday in a given year, Feb 29 -> Mar 1 on common years
+  function birthdayIn(year, bm, bd){
+    let d = new Date(year, bm, bd);
+    if (bm === 1 && bd === 29 && d.getMonth() !== 1) d = new Date(year, 2, 1);
+    return d;
+  }
+  const DAY = 86400000;
+
+  function render(){
+    const b = ymd(birthEl.value), r = ymd(refEl.value);
+    const err = $('errMsg'), meta = $('meta'), precise = $('agePrecise'), main = $('ageMain');
+
+    if (!b || !r){
+      main.textContent = '—';
+      precise.hidden = true; meta.style.display = 'none';
+      err.hidden = false; err.textContent = '날짜를 올바르게 입력해 주세요.';
+      return;
+    }
+    if (r < b){
+      main.textContent = '—';
+      precise.hidden = true; meta.style.display = 'none';
+      err.hidden = false; err.textContent = '기준일이 생년월일보다 빠릅니다.';
+      $('korAge').textContent = '—'; $('yearAge').textContent = '—';
+      return;
+    }
+    err.hidden = true;
+    precise.hidden = false;
+    meta.style.display = 'flex';
+
+    const bm = b.getMonth(), bd = b.getDate();
+    const ry = r.getFullYear(), by = b.getFullYear();
+    const bdayThis = birthdayIn(ry, bm, bd);
+    const passed = r >= bdayThis;
+
+    const man = ry - by - (passed ? 0 : 1);
+    const kor = ry - by + 1;
+    const yr = ry - by;
+
+    // breakdown since last birthday
+    const lastB = passed ? bdayThis : birthdayIn(ry - 1, bm, bd);
+    let months = (r.getFullYear() - lastB.getFullYear()) * 12 + (r.getMonth() - lastB.getMonth());
+    let days = r.getDate() - lastB.getDate();
+    if (days < 0){
+      months -= 1;
+      days += new Date(r.getFullYear(), r.getMonth(), 0).getDate();
+    }
+
+    const nextB = passed ? birthdayIn(ry + 1, bm, bd) : bdayThis;
+    const toNext = Math.round((nextB - r) / DAY);
+    const lived = Math.round((r - b) / DAY);
+
+    main.innerHTML = '만 ' + man + '<span class="unit">세</span>';
+    let pstr = man + '세';
+    if (months) pstr += ' ' + months + '개월';
+    if (days) pstr += ' ' + days + '일';
+    if (!months && !days) pstr += ' 정각 — 오늘이 생일';
+    precise.textContent = pstr;
+
+    $('ddayVal').textContent = toNext === 0 ? 'D-DAY' : 'D-' + toNext;
+    $('nextDate').textContent = nextB.getFullYear() + '. ' + (nextB.getMonth()+1) + '. ' + nextB.getDate() + '. (' + WD[nextB.getDay()] + ')';
+    $('livedVal').textContent = nf.format(lived) + '일';
+
+    $('korAge').textContent = kor + '세';
+    $('yearAge').textContent = yr + '세';
+
+    $('hint').hidden = birthEl.value !== '1992-03-15';
+  }
+
+  $('todayBtn').addEventListener('click', () => { refEl.value = refEl.dataset.today; render(); });
+  birthEl.addEventListener('input', render);
+  refEl.addEventListener('input', render);
+  render();
+</script>

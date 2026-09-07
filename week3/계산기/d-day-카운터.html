@@ -1,0 +1,281 @@
+<title>D-Day 카운터</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nanum+Myeongjo:wght@400;700;800&family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#F5F3ED;
+    --surface:#FCFBF8;
+    --surface-2:#EFEBE1;
+    --line:#E3DFD3;
+    --ink:#22262C;
+    --ink-soft:#5C616A;
+    --seal:#BB4231;
+    --jade:#3A7B6A;
+    --shadow:0 1px 2px rgba(34,38,44,.04),0 12px 32px -12px rgba(34,38,44,.14);
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --paper:#15171A;--surface:#1E2125;--surface-2:#262A2E;--line:#2F3439;
+      --ink:#EAE8E1;--ink-soft:#969CA2;--seal:#E4715D;--jade:#77B9A6;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#15171A;--surface:#1E2125;--surface-2:#262A2E;--line:#2F3439;
+    --ink:#EAE8E1;--ink-soft:#969CA2;--seal:#E4715D;--jade:#77B9A6;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 16px 40px -16px rgba(0,0,0,.6);
+  }
+
+  *{box-sizing:border-box}
+  body{
+    background:var(--paper);color:var(--ink);
+    font-family:"Noto Sans KR","Apple SD Gothic Neo",system-ui,sans-serif;
+    line-height:1.7;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:592px;margin:0 auto;padding:clamp(28px,7vw,64px) 20px 72px}
+
+  header{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+  .seal{
+    flex:none;width:46px;height:46px;border:2px solid var(--seal);border-radius:7px;
+    display:grid;place-items:center;
+    font-family:"Nanum Myeongjo",serif;font-weight:800;font-size:1.15rem;color:var(--seal);
+    line-height:1;letter-spacing:-.03em;
+  }
+  .eyebrow{
+    font-size:.7rem;font-weight:700;letter-spacing:.22em;color:var(--ink-soft);
+    text-transform:uppercase;margin:0 0 2px;
+  }
+  h1{
+    font-family:"Nanum Myeongjo",serif;font-weight:800;
+    font-size:clamp(1.6rem,5.5vw,2.1rem);line-height:1.2;margin:0;
+    text-wrap:balance;letter-spacing:-.01em;
+  }
+  .lede{color:var(--ink-soft);font-size:.92rem;margin:0 0 24px;max-width:52ch}
+
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    box-shadow:var(--shadow);
+  }
+
+  form{padding:18px;margin-bottom:22px;display:flex;flex-direction:column;gap:14px}
+  .row{display:grid;grid-template-columns:1fr;gap:12px}
+  @media (min-width:460px){.row{grid-template-columns:1.4fr 1fr}}
+  .field{display:flex;flex-direction:column;gap:7px}
+  label{
+    font-size:.72rem;font-weight:700;letter-spacing:.14em;color:var(--ink-soft);
+    text-transform:uppercase;
+  }
+  input{
+    font-size:1rem;color:var(--ink);background:var(--paper);
+    border:1px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;
+    font-family:"Noto Sans KR",sans-serif;-webkit-appearance:none;appearance:none;
+  }
+  input[type="date"]{font-family:"IBM Plex Mono","Noto Sans KR",monospace}
+  input::-webkit-calendar-picker-indicator{opacity:.5;cursor:pointer}
+  input:focus-visible,button:focus-visible{outline:2px solid var(--seal);outline-offset:2px}
+  .add{
+    align-self:flex-start;
+    font-family:"Noto Sans KR",sans-serif;font-size:.9rem;font-weight:700;
+    color:var(--surface);background:var(--seal);
+    border:none;border-radius:8px;padding:10px 20px;cursor:pointer;
+  }
+  .add:hover{filter:brightness(1.06)}
+
+  .list{display:flex;flex-direction:column;gap:10px;list-style:none;margin:0;padding:0}
+  .sep{
+    font-size:.7rem;font-weight:700;letter-spacing:.16em;color:var(--ink-soft);
+    text-transform:uppercase;margin:16px 0 2px;
+  }
+  .sep:first-child{margin-top:0}
+
+  .event{
+    display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;
+    padding:16px 16px 16px 18px;border-left:3px solid var(--seal);
+  }
+  .event.past{border-left-color:var(--ink-soft);opacity:.72}
+  .event.today{border-left-color:var(--jade)}
+  .e-name{font-weight:700;font-size:1.02rem;margin:0;overflow-wrap:anywhere}
+  .e-date{
+    font-family:"IBM Plex Mono",monospace;font-size:.8rem;color:var(--ink-soft);
+    margin:2px 0 0;font-variant-numeric:tabular-nums;
+  }
+  .e-tag{
+    font-size:.64rem;font-weight:700;letter-spacing:.1em;color:var(--seal);
+    border:1px solid color-mix(in srgb,var(--seal) 35%,transparent);
+    border-radius:99px;padding:2px 7px;text-transform:uppercase;
+  }
+  .dcount{
+    font-family:"Nanum Myeongjo",serif;font-weight:800;font-size:1.7rem;line-height:1;
+    color:var(--seal);letter-spacing:-.02em;font-variant-numeric:tabular-nums;
+    white-space:nowrap;
+  }
+  .event.past .dcount{color:var(--ink-soft)}
+  .event.today .dcount{color:var(--jade)}
+  .del{
+    grid-column:3;grid-row:1;
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;
+    font-size:1.1rem;line-height:1;padding:4px;align-self:start;
+  }
+  .del:hover{color:var(--seal)}
+  .event .stack{grid-column:2;text-align:right;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+  .sub{font-family:"IBM Plex Mono",monospace;font-size:.72rem;color:var(--ink-soft)}
+
+  .empty{padding:32px 18px;text-align:center;color:var(--ink-soft);font-size:.9rem}
+
+  footer{margin-top:26px;font-size:.8rem;color:var(--ink-soft);line-height:1.65}
+  footer .rule{width:34px;height:2px;background:var(--seal);margin:0 0 14px;border:0}
+  footer b{color:var(--ink);font-weight:700}
+  .note{font-size:.74rem;color:var(--ink-soft);margin:10px 2px 0}
+
+  @media (prefers-reduced-motion:no-preference){
+    .event{transition:opacity .2s ease}
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="seal" aria-hidden="true">D-</div>
+    <div>
+      <p class="eyebrow">Countdown</p>
+      <h1>D-Day 카운터</h1>
+    </div>
+  </header>
+
+  <p class="lede">기다리는 날들을 모아 두면 가까운 순서로 며칠 남았는지 세어 줍니다. D-day는 그날 당일, 지난 날은 D+로 표시합니다.</p>
+
+  <form class="card" id="form" autocomplete="off">
+    <div class="row">
+      <div class="field">
+        <label for="name">일정 이름</label>
+        <input type="text" id="name" placeholder="예: 수능, 전역, 여행" maxlength="24">
+      </div>
+      <div class="field">
+        <label for="date">날짜</label>
+        <input type="date" id="date">
+      </div>
+    </div>
+    <button type="submit" class="add">추가하기</button>
+  </form>
+
+  <ul class="list" id="list"></ul>
+  <p class="note" id="note">예시 일정이 들어가 있어요. × 를 눌러 지우고 내 일정을 추가하세요. 목록은 이 브라우저에만 저장됩니다.</p>
+
+  <footer>
+    <hr class="rule">
+    <p><b>D-day 세는 법</b> — 목표일을 1일로 보지 않고, 오늘과 목표일 사이의 날짜 수를 셉니다. 내일이 목표일이면 D-1, 오늘이면 D-day, 어제였다면 D+1입니다. (군대식 전역 D-day와 같은 방식)</p>
+  </footer>
+</div>
+
+<script>
+  const $ = s => document.querySelector(s);
+  const listEl = $('#list'), noteEl = $('#note');
+  const KEY = 'dday-events-v1';
+  const DAY = 86400000;
+  const WD = ['일','월','화','수','목','금','토'];
+  const nf = new Intl.NumberFormat('ko-KR');
+
+  function todayMid(){ const t = new Date(); return new Date(t.getFullYear(), t.getMonth(), t.getDate()); }
+  function iso(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+  function parse(s){ const p = s.split('-').map(Number); return new Date(p[0], p[1]-1, p[2]); }
+
+  function seed(){
+    const t = todayMid();
+    return [
+      { id:'s1', name:'2027 수능', date:'2026-11-19' },
+      { id:'s2', name:'프로젝트 마감', date:iso(new Date(t.getTime()+12*DAY)) },
+      { id:'s3', name:'새해 첫날', date:'2027-01-01' },
+      { id:'s4', name:'개강일', date:iso(new Date(t.getTime()-6*DAY)) },
+    ];
+  }
+
+  let events;
+  try{
+    const raw = localStorage.getItem(KEY);
+    events = raw ? JSON.parse(raw) : seed();
+  }catch(e){ events = seed(); }
+  let seeded = false;
+  try{ seeded = !localStorage.getItem(KEY); }catch(e){ seeded = true; }
+
+  function save(){
+    try{ localStorage.setItem(KEY, JSON.stringify(events)); seeded = false; }catch(e){}
+  }
+
+  function dInfo(dateStr){
+    const target = parse(dateStr);
+    const diff = Math.round((target - todayMid()) / DAY);
+    let label, cls;
+    if (diff > 0){ label = 'D-' + diff; cls = ''; }
+    else if (diff === 0){ label = 'D-DAY'; cls = 'today'; }
+    else { label = 'D+' + (-diff); cls = 'past'; }
+    const wk = Math.floor(Math.abs(diff) / 7), rd = Math.abs(diff) % 7;
+    let sub = '';
+    if (Math.abs(diff) >= 7) sub = wk + '주' + (rd ? ' ' + rd + '일' : '');
+    return { diff, label, cls, sub, wd: WD[target.getDay()] };
+  }
+
+  function render(){
+    listEl.innerHTML = '';
+    if (!events.length){
+      listEl.innerHTML = '<li class="card empty">등록된 일정이 없습니다. 위에서 추가해 보세요.</li>';
+      noteEl.hidden = true;
+      return;
+    }
+    noteEl.hidden = false;
+    noteEl.textContent = seeded
+      ? '예시 일정이 들어가 있어요. × 를 눌러 지우고 내 일정을 추가하세요. 목록은 이 브라우저에만 저장됩니다.'
+      : '목록은 이 브라우저에만 저장됩니다.';
+
+    const decorated = events.map(e => ({ ...e, info: dInfo(e.date) }));
+    decorated.sort((a,b) => {
+      const ka = a.info.diff >= 0 ? [0, a.info.diff] : [1, -a.info.diff];
+      const kb = b.info.diff >= 0 ? [0, b.info.diff] : [1, -b.info.diff];
+      return ka[0] - kb[0] || ka[1] - kb[1];
+    });
+
+    let shownPastSep = false, shownUpcomingSep = false;
+    for (const e of decorated){
+      if (e.info.diff >= 0 && !shownUpcomingSep){
+        const s = document.createElement('li'); s.className = 'sep'; s.textContent = '다가오는 일정';
+        listEl.appendChild(s); shownUpcomingSep = true;
+      }
+      if (e.info.diff < 0 && !shownPastSep){
+        const s = document.createElement('li'); s.className = 'sep'; s.textContent = '지난 일정';
+        listEl.appendChild(s); shownPastSep = true;
+      }
+      const li = document.createElement('li');
+      li.className = 'card event ' + e.info.cls;
+      const tag = e.info.diff === 0 ? '<span class="e-tag">오늘</span>' : '';
+      li.innerHTML =
+        '<div><p class="e-name">' + esc(e.name) + ' ' + tag + '</p>' +
+        '<p class="e-date">' + e.date.replace(/-/g, '. ') + '. (' + e.info.wd + ')</p></div>' +
+        '<div class="stack"><span class="dcount">' + e.info.label + '</span>' +
+        (e.info.sub ? '<span class="sub">' + e.info.sub + '</span>' : '') + '</div>' +
+        '<button class="del" aria-label="삭제" data-id="' + e.id + '">&times;</button>';
+      listEl.appendChild(li);
+    }
+  }
+
+  function esc(s){ return s.replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  $('#form').addEventListener('submit', ev => {
+    ev.preventDefault();
+    const name = $('#name').value.trim(), date = $('#date').value;
+    if (!name || !date) return;
+    events.push({ id: 'e' + Date.now(), name, date });
+    save();
+    $('#name').value = ''; $('#date').value = '';
+    render();
+  });
+
+  listEl.addEventListener('click', ev => {
+    const btn = ev.target.closest('.del');
+    if (!btn) return;
+    events = events.filter(e => e.id !== btn.dataset.id);
+    save();
+    render();
+  });
+
+  $('#date').min = '1900-01-01';
+  render();
+</script>
