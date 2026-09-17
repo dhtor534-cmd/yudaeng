@@ -1,0 +1,1410 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>드림캔버스 — 프롬프트 이미지 생성기 (목업)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" />
+<style>
+  :root {
+    --bg: #0B0C10; --bg-2: #0F1117; --panel: #14161F; --panel-2: #191C26;
+    --line: #262A36; --line-soft: #1E222C;
+    --ink: #EEF1F6; --dim: #99A1B2; --faint: #636B7C;
+    --brand: #8B7CFF; --brand-2: #57D9FF; --accent: #FF7AC6;
+    --ok: #55D6A0; --warn: #F2C14E; --danger: #FF6B6B;
+    --glow: 0 0 0 1px rgba(139,124,255,.35), 0 18px 46px -20px rgba(139,124,255,.55);
+    --shadow: 0 24px 60px -30px rgba(0,0,0,.9);
+    --r: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(1100px 620px at 12% -12%, rgba(139,124,255,.16), transparent 62%),
+      radial-gradient(900px 520px at 92% 4%, rgba(87,217,255,.10), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans KR", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  img { max-width: 100%; display: block; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  ::selection { background: rgba(139,124,255,.35); }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+  /* ---------- 레이아웃 ---------- */
+  #root { min-height: 100%; }
+  .app { display: grid; grid-template-columns: 252px 1fr; min-height: 100vh; }
+
+  .side {
+    border-right: 1px solid var(--line); background: linear-gradient(180deg, var(--bg-2), rgba(15,17,23,.55));
+    padding: 20px 16px; display: flex; flex-direction: column; gap: 22px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand .mark {
+    width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+    background: conic-gradient(from 210deg, var(--brand), var(--brand-2), var(--accent), var(--brand));
+    box-shadow: var(--glow); font-size: 17px;
+  }
+  .brand h1 { margin: 0; font-family: "Space Grotesk", sans-serif; font-size: 17px; letter-spacing: -.2px; }
+  .brand small { display: block; color: var(--faint); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; }
+
+  .nav { display: flex; flex-direction: column; gap: 4px; }
+  .nav button {
+    display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+    padding: 9px 11px; border-radius: 10px; border: 1px solid transparent;
+    background: transparent; color: var(--dim); font-size: 14px; transition: .15s;
+  }
+  .nav button:hover { background: var(--panel); color: var(--ink); }
+  .nav button[aria-current="true"] { background: var(--panel-2); border-color: var(--line); color: var(--ink); font-weight: 600; }
+  .nav .count { margin-left: auto; font-size: 11px; color: var(--faint); font-family: "IBM Plex Mono", monospace; }
+
+  .side h2 {
+    margin: 0 0 8px; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); font-weight: 600;
+  }
+  .credits { border: 1px solid var(--line); border-radius: var(--r); padding: 12px; background: var(--panel); }
+  .credits .num { font-family: "Space Grotesk", sans-serif; font-size: 24px; font-weight: 700; }
+  .credits .num span { font-size: 12px; color: var(--faint); font-weight: 500; }
+  .track { height: 6px; border-radius: 99px; background: #23262F; overflow: hidden; margin-top: 8px; }
+  .track > i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand), var(--brand-2)); }
+
+  .recent { display: flex; flex-direction: column; gap: 6px; }
+  .recent button {
+    text-align: left; border: 1px solid var(--line-soft); background: transparent; color: var(--dim);
+    border-radius: 9px; padding: 7px 9px; font-size: 12px; line-height: 1.4;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .recent button:hover { color: var(--ink); border-color: var(--line); background: var(--panel); }
+
+  .fakenote {
+    margin-top: auto; border: 1px dashed #2E3342; border-radius: 12px; padding: 10px 11px;
+    font-size: 11.5px; color: var(--faint); line-height: 1.5;
+  }
+  .fakenote b { color: var(--dim); }
+
+  .main { min-width: 0; display: flex; flex-direction: column; }
+  .topbar {
+    position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px);
+    background: rgba(11,12,16,.82); border-bottom: 1px solid var(--line);
+    padding: 14px 24px;
+  }
+  .content { padding: 22px 24px 80px; max-width: 1180px; width: 100%; margin: 0 auto; }
+
+  /* ---------- 프롬프트 바 ---------- */
+  .promptbar { border: 1px solid var(--line); border-radius: 16px; background: var(--panel); overflow: hidden; }
+  .promptbar.focus { border-color: rgba(139,124,255,.6); box-shadow: var(--glow); }
+  .prow { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; }
+  .prow .slash { color: var(--brand); font-family: "IBM Plex Mono", monospace; font-size: 13px; padding-top: 9px; }
+  .promptbar textarea {
+    flex: 1; border: 0; background: transparent; resize: none; outline: none;
+    font-size: 15px; line-height: 1.6; padding: 8px 0; min-height: 44px; max-height: 160px;
+  }
+  .promptbar textarea::placeholder { color: var(--faint); }
+  .gen {
+    border: 0; border-radius: 11px; padding: 10px 18px; font-weight: 600; font-size: 14px;
+    background: linear-gradient(135deg, var(--brand), #6E5CFF); color: #fff; box-shadow: var(--glow);
+    white-space: nowrap; transition: .15s;
+  }
+  .gen:hover:not(:disabled) { filter: brightness(1.1); }
+  .gen:disabled { opacity: .45; box-shadow: none; cursor: not-allowed; }
+
+  .pfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line-soft); background: var(--panel-2); }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--dim); padding: 5px 9px; font-size: 12px; font-family: "IBM Plex Mono", monospace; }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #fff; }
+  .seg button:hover:not([aria-pressed="true"]) { background: #222635; color: var(--ink); }
+  .field { display: flex; align-items: center; gap: 7px; border: 1px solid var(--line); border-radius: 9px; padding: 4px 9px; font-size: 12px; color: var(--dim); }
+  .field select { border: 0; background: transparent; outline: none; font-size: 12px; }
+  .field select option { background: #14161F; }
+  .field input[type="range"] { width: 92px; accent-color: var(--brand); }
+  .field input[type="text"] { border: 0; background: transparent; outline: none; width: 130px; font-size: 12px; }
+  .field b { color: var(--ink); font-family: "IBM Plex Mono", monospace; font-weight: 500; min-width: 30px; text-align: right; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .chip {
+    border: 1px solid var(--line); background: transparent; color: var(--dim);
+    border-radius: 99px; padding: 5px 11px; font-size: 12px; transition: .15s;
+  }
+  .chip:hover { color: var(--ink); border-color: #38405A; background: var(--panel); }
+  .chip[aria-pressed="true"] { background: rgba(139,124,255,.16); border-color: rgba(139,124,255,.5); color: #CFC7FF; }
+
+  /* ---------- 작업 카드 ---------- */
+  .job { border: 1px solid var(--line); border-radius: 16px; background: var(--panel); padding: 16px; margin-top: 18px; box-shadow: var(--shadow); }
+  .job header { display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+  .job .avatar { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, #2B3040, #191C26); display: grid; place-items: center; font-size: 14px; border: 1px solid var(--line); flex: none; }
+  .job .ptext { font-size: 14.5px; line-height: 1.5; min-width: 0; }
+  .job .ptext em { font-style: normal; color: var(--brand-2); font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
+  .job .meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; font-size: 11.5px; color: var(--faint); font-family: "IBM Plex Mono", monospace; }
+  .job .meta span { border: 1px solid var(--line-soft); border-radius: 6px; padding: 1px 6px; }
+  .job .kill { margin-left: auto; border: 1px solid var(--line); background: transparent; color: var(--faint); border-radius: 8px; padding: 4px 8px; font-size: 12px; flex: none; }
+  .job .kill:hover { color: var(--danger); border-color: rgba(255,107,107,.4); }
+
+  .grid { display: grid; gap: 8px; }
+  .grid.g4 { grid-template-columns: 1fr 1fr; max-width: 720px; }
+  .grid.g1 { grid-template-columns: 1fr; max-width: 520px; }
+
+  .tile { position: relative; border-radius: 12px; overflow: hidden; background: #0D0F15; border: 1px solid var(--line-soft); cursor: pointer; }
+  .tile .ph { width: 100%; display: block; }
+  .tile img { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; transition: filter .5s ease, transform .3s ease, opacity .4s; }
+  .tile:hover img { transform: scale(1.02); }
+  .tile .badge {
+    position: absolute; left: 8px; top: 8px; font-family: "IBM Plex Mono", monospace; font-size: 10.5px;
+    background: rgba(10,11,15,.72); border: 1px solid rgba(255,255,255,.1); color: #D8DEEA;
+    border-radius: 6px; padding: 2px 6px; backdrop-filter: blur(6px);
+  }
+  .tile .heart {
+    position: absolute; right: 8px; top: 8px; border: 0; border-radius: 8px; padding: 3px 7px; font-size: 12px;
+    background: rgba(10,11,15,.72); backdrop-filter: blur(6px); opacity: 0; transition: .15s;
+  }
+  .tile:hover .heart, .tile .heart.on { opacity: 1; }
+  .tile .prog {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    background: linear-gradient(180deg, rgba(11,12,16,.35), rgba(11,12,16,.62)); overflow: hidden;
+  }
+  .tile .prog .pct { font-family: "Space Grotesk", sans-serif; font-size: 20px; font-weight: 700; text-shadow: 0 2px 12px rgba(0,0,0,.7); }
+  .tile .prog .bar { width: 62%; height: 4px; border-radius: 99px; background: rgba(255,255,255,.16); overflow: hidden; }
+  .tile .prog .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--brand-2), var(--brand)); transition: width .3s; }
+  .tile .prog .label { font-size: 11px; color: #C7CEDC; font-family: "IBM Plex Mono", monospace; }
+  .tile .prog::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.07), transparent);
+    animation: shimmer 1.9s linear infinite;
+  }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; align-items: center; }
+  .act {
+    border: 1px solid var(--line); background: var(--panel-2); color: var(--dim);
+    border-radius: 8px; padding: 5px 10px; font-size: 12px; font-family: "IBM Plex Mono", monospace; transition: .15s;
+  }
+  .act:hover:not(:disabled) { color: var(--ink); border-color: #3A4258; background: #232735; }
+  .act:disabled { opacity: .35; cursor: not-allowed; }
+  .act.wide { font-family: "IBM Plex Sans KR", sans-serif; }
+  .act.pri { border-color: rgba(139,124,255,.45); color: #CFC7FF; }
+  .sep { width: 1px; height: 18px; background: var(--line); margin: 0 4px; }
+
+  /* ---------- 갤러리 ---------- */
+  .gal { columns: 4 190px; column-gap: 10px; }
+  .gal > figure { break-inside: avoid; margin: 0 0 10px; position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line-soft); cursor: pointer; }
+  .gal figcaption {
+    position: absolute; inset: auto 0 0 0; padding: 22px 10px 8px; font-size: 11px; color: #D5DBE7;
+    background: linear-gradient(180deg, transparent, rgba(8,9,12,.88)); opacity: 0; transition: .18s;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gal > figure:hover figcaption { opacity: 1; }
+
+  /* ---------- 모달 ---------- */
+  .modal { position: fixed; inset: 0; z-index: 60; background: rgba(6,7,10,.8); backdrop-filter: blur(8px); display: grid; place-items: center; padding: 24px; }
+  .sheet {
+    position: relative; background: var(--panel); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow);
+    max-width: 1020px; width: 100%; max-height: 90vh; overflow: auto;
+    display: grid; grid-template-columns: minmax(0,1.5fr) 300px;
+  }
+  .sheet .view { background: #07080B; display: grid; place-items: center; padding: 16px; border-right: 1px solid var(--line); min-width: 0; }
+  .sheet .view img { border-radius: 10px; max-height: 76vh; width: auto; }
+  .sheet aside { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .sheet aside h3 { margin: 0; font-size: 15px; font-family: "Space Grotesk", sans-serif; }
+  .sheet aside .pq { font-size: 13px; color: var(--dim); line-height: 1.55; }
+  .kv { display: grid; grid-template-columns: 74px 1fr; gap: 6px 10px; font-size: 12px; margin: 0; }
+  .kv dt { color: var(--faint); }
+  .kv dd { margin: 0; font-family: "IBM Plex Mono", monospace; word-break: break-all; }
+  .closer { position: absolute; right: 14px; top: 12px; border: 1px solid var(--line); background: rgba(20,22,31,.92); border-radius: 9px; padding: 4px 10px; font-size: 13px; z-index: 2; }
+
+  .empty { border: 1px dashed var(--line); border-radius: 16px; padding: 56px 24px; text-align: center; color: var(--faint); }
+  .empty .big { font-size: 34px; margin-bottom: 8px; }
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); z-index: 90;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px;
+    padding: 9px 16px; font-size: 13px; box-shadow: var(--shadow);
+  }
+  @keyframes shimmer { 0% { transform: translateX(-100%) } 100% { transform: translateX(100%) } }
+
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 12px; }
+    .side .credits, .side .recent, .side h2 { display: none; }
+    .nav { flex-direction: row; }
+    .fakenote { margin: 0; flex-basis: 100%; }
+    .sheet { grid-template-columns: 1fr; }
+    .sheet .view { border-right: 0; border-bottom: 1px solid var(--line); }
+    .content { padding: 16px 14px 60px; }
+    .topbar { padding: 12px 14px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+
+<!-- ================= 아트 엔진: 시드 → 캔버스 그림 (API 없음) ================= -->
+<script>
+/* 문자열 → 32bit 해시 (FNV-1a) */
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return h >>> 0;
+}
+/* 시드 난수 (mulberry32) — 같은 시드면 항상 같은 그림 */
+function rngOf(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hx(h) {
+  h = h.replace('#', '');
+  if (h.length === 3) h = h.split('').map(function (c) { return c + c; }).join('');
+  const n = parseInt(h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+function rgba(h, a) { const c = hx(h); return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+function mix(a, b, t) {
+  const A = hx(a), B = hx(b);
+  const f = function (i) { return Math.round(A[i] + (B[i] - A[i]) * t); };
+  return 'rgb(' + f(0) + ',' + f(1) + ',' + f(2) + ')';
+}
+
+/* 프롬프트 키워드 → 팔레트 (미드저니의 "분위기"를 흉내내는 가짜 규칙) */
+const PALETTES = [
+  { id: 'neon', name: '네온 시티', kind: 'city',
+    keys: ['네온','사이버','펑크','도시','야경','골목','도쿄','서울','빌딩','neon','cyber','city','tokyo','street','punk'],
+    sky: ['#090622','#2B0B52','#7A1668'], sun: '#FF3FA4', accent: '#00E5FF', ground: '#080411', haze: '#FF2D95' },
+  { id: 'sunset', name: '황혼 사막', kind: 'dune',
+    keys: ['사막','노을','석양','황혼','모래','낙타','오렌지','desert','sunset','dune','sand','golden'],
+    sky: ['#2A1030','#8A2F3D','#F2A05A'], sun: '#FFD48A', accent: '#FF8A4C', ground: '#3A1B24', haze: '#F2A05A' },
+  { id: 'ocean', name: '심해 바다', kind: 'sea',
+    keys: ['바다','해변','파도','해안','섬','등대','호수','물','ocean','sea','beach','wave','island','water'],
+    sky: ['#04182E','#0A4A6B','#4FC3D9'], sun: '#FFF1B8', accent: '#6FE3D2', ground: '#032235', haze: '#8FE0F2' },
+  { id: 'forest', name: '안개 숲', kind: 'forest',
+    keys: ['숲','나무','정글','이끼','계곡','초록','대나무','forest','jungle','tree','woods','moss','green'],
+    sky: ['#07160F','#124430','#5BA871'], sun: '#E7F5B8', accent: '#8FE08A', ground: '#04120C', haze: '#9AD9A6' },
+  { id: 'alpine', name: '설산 / 오로라', kind: 'mountain',
+    keys: ['눈','설산','겨울','산','알프스','빙하','오로라','얼음','snow','winter','mountain','ice','aurora','alps'],
+    sky: ['#0A1430','#2A4F86','#A8CFF0'], sun: '#FFFFFF', accent: '#7FD4FF', ground: '#101C36', haze: '#CFE6FA' },
+  { id: 'galaxy', name: '우주', kind: 'space',
+    keys: ['우주','은하','별','행성','성운','우주선','sf','space','galaxy','star','planet','nebula','cosmic'],
+    sky: ['#02030E','#150A3A','#3A1370'], sun: '#FFD9F2', accent: '#8B7CFF', ground: '#02030A', haze: '#B39BFF' },
+  { id: 'sakura', name: '벚꽃 파스텔', kind: 'forest',
+    keys: ['벚꽃','꽃','봄','파스텔','수채화','정원','분홍','flower','sakura','pastel','spring','bloom','garden'],
+    sky: ['#2B1430','#7A3A63','#F6C6D8'], sun: '#FFF3F7', accent: '#FF9FC4', ground: '#3B1F33', haze: '#FFC7DD' },
+  { id: 'noir', name: '느와르', kind: 'city',
+    keys: ['느와르','흑백','어둠','비','빗','공포','고딕','그림자','안개','noir','dark','rain','gothic','horror','fog'],
+    sky: ['#0A0B0E','#1D2026','#4A505C'], sun: '#D8DEE9', accent: '#7C8899', ground: '#06070A', haze: '#8C97A6' },
+  { id: 'ember', name: '용암', kind: 'mountain',
+    keys: ['불','용암','화산','붉은','드래곤','지옥','폭발','fire','lava','volcano','ember','red','dragon'],
+    sky: ['#150406','#4E0B12','#C0341C'], sun: '#FFCF6B', accent: '#FF6B3D', ground: '#1A0507', haze: '#FF7A3D' },
+  { id: 'dream', name: '몽환 추상', kind: 'abstract',
+    keys: ['추상','몽환','꿈','그라디언트','유체','미니멀','패턴','abstract','dream','fluid','gradient','minimal','shape'],
+    sky: ['#0B0A1F','#3B2A73','#8E6CC9'], sun: '#FFE6C7', accent: '#57D9FF', ground: '#0A0917', haze: '#C7A8FF' }
+];
+const FIGURE_KEYS = ['인물','소녀','소년','사람','얼굴','초상','캐릭터','여자','남자','전사','기사','마녀','portrait','girl','boy','woman','man','face','character','knight','witch'];
+
+function pickPalette(prompt, seed) {
+  const p = (prompt || '').toLowerCase();
+  let best = null, bestScore = 0;
+  for (const pal of PALETTES) {
+    let s = 0;
+    for (const k of pal.keys) if (p.indexOf(k) >= 0) s += k.length > 2 ? 2 : 1;
+    if (s > bestScore) { bestScore = s; best = pal; }
+  }
+  return best || PALETTES[seed % PALETTES.length];
+}
+function hasFigure(prompt) {
+  const p = (prompt || '').toLowerCase();
+  return FIGURE_KEYS.some(function (k) { return p.indexOf(k) >= 0; });
+}
+
+const AR_LIST = [
+  { id: '1:1', w: 1, h: 1 }, { id: '3:2', w: 3, h: 2 }, { id: '2:3', w: 2, h: 3 },
+  { id: '16:9', w: 16, h: 9 }, { id: '9:16', w: 9, h: 16 }
+];
+function arOf(id) { return AR_LIST.find(function (a) { return a.id === id; }) || AR_LIST[0]; }
+function dims(arId, long) {
+  const a = arOf(arId);
+  return a.w >= a.h
+    ? { w: long, h: Math.round(long * a.h / a.w) }
+    : { w: Math.round(long * a.w / a.h), h: long };
+}
+/* 화면에 표시할 "해상도" 라벨 (실제 캔버스 크기와 별개인 가짜 스펙) */
+function resLabel(arId, scale) {
+  const a = arOf(arId), base = 1024 * (scale || 1);
+  const d = a.w >= a.h
+    ? { w: base, h: Math.round(base * a.h / a.w / 8) * 8 }
+    : { w: Math.round(base * a.w / a.h / 8) * 8, h: base };
+  return d.w + ' × ' + d.h;
+}
+
+function glow(g, x, y, rad, color, alpha) {
+  const gr = g.createRadialGradient(x, y, 0, x, y, rad);
+  gr.addColorStop(0, rgba(color, alpha));
+  gr.addColorStop(0.45, rgba(color, alpha * 0.32));
+  gr.addColorStop(1, rgba(color, 0));
+  g.fillStyle = gr;
+  g.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+}
+
+/* ---- 장면 유형별 그리기 ---- */
+function sceneCity(g, w, h, hz, pal, r) {
+  for (let L = 0; L < 3; L++) {
+    const col = mix(pal.ground, pal.sky[2], Math.max(0, 0.55 - L * 0.24));
+    const base = hz + h * 0.05 * L + h * 0.02;
+    let x = -w * 0.05;
+    while (x < w * 1.05) {
+      const bw = w * (0.025 + r() * 0.07);
+      const bh = h * (0.06 + r() * 0.34) * (1 - L * 0.12);
+      const top = base - bh;
+      g.fillStyle = col;
+      g.fillRect(x, top, bw, h - top);
+      if (L >= 1) {
+        const cols = Math.max(1, Math.floor(bw / (w * 0.014)));
+        const rows = Math.max(1, Math.floor(bh / (h * 0.032)));
+        for (let i = 0; i < cols; i++) for (let j = 0; j < rows; j++) {
+          if (r() > 0.6) {
+            g.fillStyle = rgba(r() > 0.5 ? pal.accent : pal.sun, 0.22 + r() * 0.55);
+            g.fillRect(x + bw * (i + 0.3) / cols, top + bh * (j + 0.3) / rows, bw / cols * 0.4, bh / rows * 0.32);
+          }
+        }
+      }
+      x += bw + w * 0.006;
+    }
+  }
+  const gr = g.createLinearGradient(0, hz, 0, h);
+  gr.addColorStop(0, rgba(pal.haze, 0));
+  gr.addColorStop(1, rgba(pal.haze, 0.16));
+  g.fillStyle = gr;
+  g.fillRect(0, hz, w, h - hz);
+}
+function sceneMountain(g, w, h, hz, pal, r) {
+  for (let L = 0; L < 4; L++) {
+    const col = mix(pal.ground, pal.sky[2], Math.max(0, 0.62 - L * 0.18));
+    const base = hz + h * 0.05 * L;
+    const peaks = [];
+    g.beginPath();
+    g.moveTo(-10, h);
+    g.lineTo(-10, base);
+    let x = -10;
+    while (x < w + 10) {
+      const pw = w * (0.12 + r() * 0.24);
+      const ph = h * (0.10 + r() * 0.26) * (1 - L * 0.12);
+      peaks.push([x + pw / 2, base - ph, pw]);
+      g.lineTo(x + pw / 2, base - ph);
+      g.lineTo(x + pw, base);
+      x += pw;
+    }
+    g.lineTo(w + 10, h);
+    g.closePath();
+    g.fillStyle = col;
+    g.fill();
+    if (L >= 2) {
+      g.fillStyle = rgba(pal.sun, 0.35);
+      for (const p of peaks) {
+        g.beginPath();
+        g.moveTo(p[0], p[1]);
+        g.lineTo(p[0] + p[2] * 0.16, p[1] + h * 0.05);
+        g.lineTo(p[0] - p[2] * 0.16, p[1] + h * 0.05);
+        g.closePath();
+        g.fill();
+      }
+    }
+  }
+}
+function sceneForest(g, w, h, hz, pal, r) {
+  for (let i = 0; i < 6; i++) {
+    g.fillStyle = rgba(pal.haze, 0.04 + r() * 0.07);
+    g.fillRect(0, hz - h * 0.12 + r() * h * 0.45, w, h * (0.008 + r() * 0.05));
+  }
+  for (let L = 0; L < 3; L++) {
+    const col = mix(pal.ground, pal.sky[2], Math.max(0, 0.5 - L * 0.2));
+    const base = hz + h * 0.09 * L + h * 0.07;
+    g.fillStyle = col;
+    let x = -w * 0.04;
+    while (x < w * 1.04) {
+      const tw = w * (0.03 + r() * 0.05);
+      const th = h * (0.12 + r() * 0.3) * (1 - L * 0.1);
+      g.beginPath();
+      g.moveTo(x + tw / 2, base - th);
+      g.lineTo(x + tw, base);
+      g.lineTo(x, base);
+      g.closePath();
+      g.fill();
+      g.fillRect(x + tw * 0.44, base - h * 0.004, tw * 0.12, h * 0.07);
+      x += tw * (0.5 + r() * 0.5);
+    }
+    g.fillRect(0, base, w, h - base);
+  }
+}
+function sceneSea(g, w, h, hz, pal, r, sx) {
+  const gr = g.createLinearGradient(0, hz, 0, h);
+  gr.addColorStop(0, mix(pal.sky[2], pal.ground, 0.3));
+  gr.addColorStop(1, pal.ground);
+  g.fillStyle = gr;
+  g.fillRect(0, hz, w, h - hz);
+  for (let i = 0; i < 90; i++) {
+    const y = hz + Math.pow(r(), 1.7) * (h - hz);
+    const spread = (y - hz) / Math.max(1, h - hz);
+    const lw = w * (0.02 + r() * 0.12) * (0.4 + spread);
+    const x = sx - lw / 2 + (r() - 0.5) * w * (0.12 + spread * 0.9);
+    g.fillStyle = rgba(pal.sun, (1 - spread) * 0.3 * r() + 0.04);
+    g.fillRect(x, y, lw, Math.max(1, h * 0.004 * (0.5 + spread)));
+  }
+}
+function sceneDune(g, w, h, hz, pal, r) {
+  for (let L = 0; L < 4; L++) {
+    const col = mix(pal.ground, pal.sky[2], Math.max(0, 0.55 - L * 0.16));
+    const base = hz + h * 0.07 * L;
+    g.beginPath();
+    g.moveTo(0, h);
+    g.lineTo(0, base);
+    let x = 0;
+    while (x < w) {
+      const nx = x + w * (0.2 + r() * 0.3);
+      g.quadraticCurveTo((x + nx) / 2, base - h * (0.02 + r() * 0.09), nx, base + h * 0.02 * (r() - 0.5));
+      x = nx;
+    }
+    g.lineTo(w, h);
+    g.closePath();
+    g.fillStyle = col;
+    g.fill();
+  }
+}
+function sceneSpace(g, w, h, hz, pal, r) {
+  for (let i = 0; i < 280; i++) {
+    g.fillStyle = rgba(i % 7 ? '#FFFFFF' : pal.accent, 0.18 + r() * 0.75);
+    g.beginPath();
+    g.arc(r() * w, r() * h, r() * 1.7 + 0.3, 0, 7);
+    g.fill();
+  }
+  g.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 6; i++) glow(g, r() * w, r() * h, w * (0.12 + r() * 0.3), i % 2 ? pal.accent : pal.haze, 0.1 + r() * 0.14);
+  g.globalCompositeOperation = 'source-over';
+  const px = w * (0.18 + r() * 0.64), py = h * (0.2 + r() * 0.5), pr = Math.min(w, h) * (0.1 + r() * 0.16);
+  g.save();
+  g.translate(px, py);
+  g.rotate(-0.35 + r() * 0.5);
+  g.scale(1, 0.24);
+  g.beginPath();
+  g.arc(0, 0, pr * 1.75, 0, 7);
+  g.lineWidth = pr * 0.2;
+  g.strokeStyle = rgba(pal.accent, 0.4);
+  g.stroke();
+  g.restore();
+  const pg = g.createRadialGradient(px - pr * 0.35, py - pr * 0.4, pr * 0.1, px, py, pr);
+  pg.addColorStop(0, mix(pal.sun, '#ffffff', 0.3));
+  pg.addColorStop(0.65, pal.haze);
+  pg.addColorStop(1, mix(pal.ground, '#000000', 0.4));
+  g.beginPath();
+  g.arc(px, py, pr, 0, 7);
+  g.fillStyle = pg;
+  g.fill();
+}
+function sceneAbstract(g, w, h, pal, r) {
+  g.globalCompositeOperation = 'lighter';
+  const cols = [pal.accent, pal.haze, pal.sun];
+  for (let i = 0; i < 10; i++) {
+    g.beginPath();
+    g.moveTo(-w * 0.1, r() * h);
+    g.bezierCurveTo(w * 0.3, r() * h, w * 0.7, r() * h, w * 1.1, r() * h);
+    g.lineWidth = h * (0.01 + r() * 0.09);
+    g.strokeStyle = rgba(cols[i % 3], 0.07 + r() * 0.15);
+    g.stroke();
+  }
+  g.globalCompositeOperation = 'source-over';
+}
+function drawFigure(g, w, h, pal, r) {
+  const headR = Math.min(w, h) * (0.085 + r() * 0.03);
+  const cx = w * (0.32 + r() * 0.36);
+  const headY = h * (0.44 + r() * 0.1);
+  const grd = g.createLinearGradient(0, headY - headR, 0, h);
+  grd.addColorStop(0, rgba(pal.ground, 0.88));
+  grd.addColorStop(1, rgba(pal.ground, 1));
+  g.fillStyle = grd;
+  g.beginPath();
+  g.arc(cx, headY, headR, 0, 7);
+  g.fill();
+  g.beginPath();
+  g.moveTo(cx - headR * 2.7, h);
+  g.quadraticCurveTo(cx - headR * 1.5, headY + headR * 1.05, cx - headR * 0.62, headY + headR * 0.9);
+  g.quadraticCurveTo(cx, headY + headR * 0.55, cx + headR * 0.62, headY + headR * 0.9);
+  g.quadraticCurveTo(cx + headR * 1.5, headY + headR * 1.05, cx + headR * 2.7, h);
+  g.closePath();
+  g.fill();
+  g.strokeStyle = rgba(pal.accent, 0.5);
+  g.lineWidth = Math.max(1.2, headR * 0.08);
+  g.beginPath();
+  g.arc(cx, headY, headR, Math.PI * 1.02, Math.PI * 1.78);
+  g.stroke();
+}
+
+/* 최종 렌더: 파라미터 하나로 PNG data URL 을 만든다 */
+function renderArt(p) {
+  const d = dims(p.ar, p.long || 760);
+  const w = d.w, h = d.h;
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const g = cv.getContext('2d');
+  const r = rngOf(p.seed);
+  const pal = pickPalette(p.prompt, p.seed);
+  const style = Math.min(1, (p.stylize == null ? 100 : p.stylize) / 1000);
+  const chaos = (p.chaos || 0) / 100;
+  const kind = pal.kind;
+
+  const sky = g.createLinearGradient(0, 0, 0, h);
+  sky.addColorStop(0, pal.sky[0]);
+  sky.addColorStop(0.55, pal.sky[1]);
+  sky.addColorStop(1, pal.sky[2]);
+  g.fillStyle = sky;
+  g.fillRect(0, 0, w, h);
+
+  const hz = h * (0.5 + (r() - 0.5) * 0.18);
+  const sx = w * (0.18 + r() * 0.64), sy = hz * (0.3 + r() * 0.45);
+
+  g.globalCompositeOperation = 'lighter';
+  glow(g, sx, sy, Math.max(w, h) * (0.3 + r() * 0.24), pal.sun, 0.75);
+  for (let i = 0; i < 4 + Math.round(chaos * 8 + style * 3); i++) {
+    glow(g, r() * w, r() * h * 0.9, Math.max(w, h) * (0.1 + r() * 0.28), i % 2 ? pal.haze : pal.accent, 0.06 + r() * 0.12);
+  }
+  g.beginPath();
+  g.arc(sx, sy, Math.max(w, h) * 0.04 * (0.55 + r()), 0, 7);
+  g.fillStyle = pal.sun;
+  g.fill();
+  g.globalCompositeOperation = 'source-over';
+
+  if (kind === 'city') sceneCity(g, w, h, hz, pal, r);
+  else if (kind === 'mountain') sceneMountain(g, w, h, hz, pal, r);
+  else if (kind === 'forest') sceneForest(g, w, h, hz, pal, r);
+  else if (kind === 'sea') sceneSea(g, w, h, hz, pal, r, sx);
+  else if (kind === 'dune') sceneDune(g, w, h, hz, pal, r);
+  else if (kind === 'space') sceneSpace(g, w, h, hz, pal, r);
+  else sceneAbstract(g, w, h, pal, r);
+
+  if (hasFigure(p.prompt)) drawFigure(g, w, h, pal, r);
+
+  /* 보케 입자 */
+  g.globalCompositeOperation = 'lighter';
+  const n = 14 + Math.round(chaos * 46 + style * 10);
+  for (let i = 0; i < n; i++) {
+    glow(g, r() * w, r() * h, Math.max(w, h) * (0.004 + r() * 0.02), r() > 0.5 ? pal.sun : pal.accent, 0.12 + r() * 0.35);
+  }
+  g.globalCompositeOperation = 'source-over';
+
+  /* 모델별 색감 보정 */
+  const wash = p.model === 'raw' ? 0.04 : 0.1 + style * (p.model === 'niji' ? 0.34 : 0.22);
+  g.globalCompositeOperation = 'overlay';
+  g.fillStyle = rgba(p.model === 'niji' ? pal.accent : pal.haze, wash);
+  g.fillRect(0, 0, w, h);
+  g.globalCompositeOperation = 'source-over';
+
+  /* 비네트 */
+  const vg = g.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.78);
+  vg.addColorStop(0, 'rgba(0,0,0,0)');
+  vg.addColorStop(1, 'rgba(0,0,0,0.55)');
+  g.fillStyle = vg;
+  g.fillRect(0, 0, w, h);
+
+  /* 필름 그레인 */
+  const amt = p.model === 'raw' ? 26 : 15;
+  const id = g.getImageData(0, 0, w, h), px = id.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const nz = (r() - 0.5) * amt;
+    px[i] += nz; px[i + 1] += nz; px[i + 2] += nz;
+  }
+  g.putImageData(id, 0, 0);
+
+  return cv.toDataURL('image/png');
+}
+</script>
+
+<!-- ================= 생성 API 클라이언트 (같은 출처의 프록시 서버만 호출) =================
+     브라우저 코드에는 fal.ai 주소도 API 키도 없다. 키는 server.js 가 환경변수에서 읽어 쓴다. -->
+<script>
+const LS_MODE = 'dreamcanvas.mode';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function apiErr(res) {
+  let detail = '';
+  try { const j = await res.json(); detail = j.detail || JSON.stringify(j).slice(0, 200); }
+  catch (e) { detail = res.statusText || ('HTTP ' + res.status); }
+  return detail;
+}
+const API = {
+  async health() {
+    const r = await fetch('api/health', { cache: 'no-store' });
+    if (!r.ok) throw new Error(await apiErr(r));
+    return r.json();
+  },
+  async submit(payload) {
+    const r = await fetch('api/imagine', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+    });
+    if (!r.ok) throw new Error(await apiErr(r));
+    return r.json();
+  },
+  async status(id) {
+    const r = await fetch('api/status/' + encodeURIComponent(id), { cache: 'no-store' });
+    if (!r.ok) throw new Error(await apiErr(r));
+    return r.json();
+  },
+  async result(id) {
+    const r = await fetch('api/result/' + encodeURIComponent(id), { cache: 'no-store' });
+    if (!r.ok) throw new Error(await apiErr(r));
+    return r.json();
+  }
+};
+
+/* 접수 → 상태 폴링 → 결과. 이미지 URL 한 장을 돌려준다. */
+async function apiRun(payload, onStatus) {
+  const job = await API.submit(payload);
+  onStatus && onStatus({ status: 'IN_QUEUE', queue_position: job.queue_position });
+  for (let i = 0; i < 240; i++) {
+    await sleep(i < 4 ? 700 : 1300);
+    const st = await API.status(job.id);
+    onStatus && onStatus(st);
+    if (st.status === 'COMPLETED') {
+      const out = await API.result(job.id);
+      const url = out.images && out.images[0] && out.images[0].url;
+      if (!url) throw new Error('응답에 이미지가 없습니다.');
+      return url;
+    }
+    if (st.status === 'FAILED' || st.status === 'ERROR') throw new Error('생성에 실패했습니다.');
+  }
+  throw new Error('시간 초과 — 응답이 오지 않았습니다.');
+}
+</script>
+
+<!-- ================= 앱 (React 18 + Babel, 빌드 없음) ================= -->
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* server 필드 = 프록시 서버가 허용하는 모델 키 (서버에서 실제 fal 엔드포인트로 바뀐다) */
+const MODELS = [
+  { id: 'schnell', label: 'FLUX.1 schnell', tag: 'flux/schnell', server: 'schnell', note: '빠름 · 저렴' },
+  { id: 'dev', label: 'FLUX.1 dev', tag: 'flux/dev', server: 'dev', note: '고품질' },
+  { id: 'niji', label: '애니 프리셋', tag: 'flux/dev·anime', server: 'dev', suffix: 'anime key visual, cel shading, vivid colors' },
+  { id: 'raw', label: '사진 프리셋', tag: 'flux/dev·photo', server: 'dev', suffix: 'photorealistic, 50mm lens, natural light' }
+];
+const SIZE_MAP = { '1:1': 'square_hd', '3:2': 'landscape_4_3', '2:3': 'portrait_4_3', '16:9': 'landscape_16_9', '9:16': 'portrait_16_9' };
+const modelOf = id => MODELS.find(m => m.id === id) || MODELS[0];
+
+const STYLE_CHIPS = [
+  { id: 'cinematic', label: '시네마틱', suffix: 'cinematic lighting, 35mm, shallow depth of field' },
+  { id: 'anime', label: '애니메이션', suffix: 'anime key visual, cel shading' },
+  { id: 'oil', label: '유화', suffix: 'oil painting, thick brush strokes' },
+  { id: 'r3d', label: '3D 렌더', suffix: 'octane render, soft studio light' },
+  { id: 'photo', label: '사진', suffix: 'photorealistic, 50mm, natural light' },
+  { id: 'water', label: '수채화', suffix: 'watercolor, soft washes' },
+  { id: 'pixel', label: '픽셀아트', suffix: 'pixel art, 16-bit' },
+  { id: 'mini', label: '미니멀', suffix: 'minimalist, wide negative space' }
+];
+const IDEAS = [
+  '비 내리는 밤의 네온 골목, 우산 쓴 사람, 젖은 아스팔트 반사',
+  '눈 덮인 설산 위로 번지는 오로라, 별이 가득한 하늘',
+  '심해 위를 떠다니는 고래와 등대, 잔잔한 물결',
+  '안개 낀 대나무 숲으로 스며드는 아침 햇살',
+  '보라색 성운 속을 지나는 고리 행성, 우주 먼지',
+  '황혼의 사막 사구를 걷는 실루엣, 긴 그림자',
+  '벚꽃이 흩날리는 정원에 선 소녀, 파스텔 톤',
+  '용암이 흐르는 화산 능선, 붉은 연기'
+];
+const uid = () => Math.random().toString(36).slice(2, 9);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+function paramTag(p) {
+  const bits = ['--ar ' + p.ar, '--s ' + p.stylize];
+  if (p.chaos > 0) bits.push('--chaos ' + p.chaos);
+  if (p.no && p.no.trim()) bits.push('--no ' + p.no.trim());
+  bits.push('--model ' + modelOf(p.model).tag);
+  return bits.join(' ');
+}
+/* 화면에 적은 프롬프트 + 스타일 칩 + 모델 프리셋 → 실제로 보낼 문장 */
+function finalPrompt(prompt, params) {
+  const m = modelOf(params.model);
+  const bits = [prompt];
+  if (m.suffix) bits.push(m.suffix);
+  if (params.no && params.no.trim()) bits.push('without ' + params.no.trim());
+  return bits.filter(Boolean).join(', ');
+}
+function ago(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 10) return '방금';
+  if (s < 60) return s + '초 전';
+  if (s < 3600) return Math.floor(s / 60) + '분 전';
+  if (s < 86400) return Math.floor(s / 3600) + '시간 전';
+  return Math.floor(s / 86400) + '일 전';
+}
+function makeImages(count, baseSeed, opts) {
+  opts = opts || {};
+  const real = opts.engine === 'fal';
+  return Array.from({ length: count }, (_, i) => ({
+    id: uid(),
+    seed: (baseSeed + i * 7919) >>> 0,
+    index: i,
+    scale: opts.scale || 1,
+    label: opts.label || String(i + 1),
+    src: null,
+    progress: real ? 0.03 : 0,
+    cap: real ? 0.92 : 1,
+    done: false,
+    liked: false,
+    fallback: false,
+    stage: real ? '전송 중' : '대기열',
+    speed: real ? 0.008 + Math.random() * 0.012 : 0.022 + Math.random() * 0.045
+  }));
+}
+function newJob(prompt, params, opts) {
+  opts = opts || {};
+  const seed = opts.seed != null ? opts.seed : hashStr(prompt + ':' + uid()) % 4294967295;
+  const engine = opts.engine || 'mock';
+  const imgs = makeImages(opts.count || 4, seed, { engine, scale: opts.scale, label: opts.label });
+  if (opts.instant) imgs.forEach(im => { im.progress = 1; im.done = true; im.cap = 1; });
+  return {
+    id: uid(), prompt, params, engine,
+    op: opts.op || 'text',
+    kind: opts.kind || 'grid',
+    srcUrl: opts.srcUrl || null,
+    from: opts.from || null,
+    seed,
+    error: null,
+    createdAt: opts.createdAt || Date.now(),
+    images: imgs
+  };
+}
+
+/* 처음 화면을 채우는 목업 히스토리 */
+function seedJobs() {
+  const base = extra => Object.assign({ ar: '16:9', stylize: 250, chaos: 0, model: 'schnell', no: '' }, extra || {});
+  const defs = [
+    ['비 내리는 밤의 네온 골목, 우산 쓴 사람, 젖은 아스팔트 반사', base({ ar: '16:9', stylize: 400 }), 1000 * 60 * 6],
+    ['눈 덮인 설산 위로 번지는 오로라, 별이 가득한 하늘', base({ ar: '3:2', stylize: 180, chaos: 12 }), 1000 * 60 * 42],
+    ['벚꽃이 흩날리는 정원에 선 소녀, 파스텔 톤', base({ ar: '2:3', model: 'niji', stylize: 520 }), 1000 * 60 * 95],
+    ['보라색 성운 속을 지나는 고리 행성, 우주 먼지', base({ ar: '1:1', stylize: 300, chaos: 24 }), 1000 * 60 * 60 * 5],
+    ['안개 낀 대나무 숲으로 스며드는 아침 햇살', base({ ar: '16:9', model: 'raw', stylize: 60 }), 1000 * 60 * 60 * 27]
+  ];
+  return defs.map(d => newJob(d[0], d[1], { instant: true, createdAt: Date.now() - d[2] }));
+}
+
+/* 목업 이미지 1장 = 캔버스 1회 렌더. 결과는 캐시해서 재사용 */
+const ART_CACHE = new Map();
+function useArt(job, img, enabled) {
+  const key = img.id + ':' + img.scale;
+  const [url, setUrl] = useState(() => ART_CACHE.get(key) || null);
+  useEffect(() => {
+    if (!enabled) return;
+    if (ART_CACHE.has(key)) { setUrl(ART_CACHE.get(key)); return; }
+    let alive = true;
+    const t = setTimeout(() => {
+      const u = renderArt({
+        seed: img.seed, prompt: job.prompt, ar: job.params.ar,
+        stylize: job.params.stylize, chaos: job.params.chaos, model: job.params.model,
+        long: img.scale > 1 ? 1100 : 760
+      });
+      ART_CACHE.set(key, u);
+      if (alive) setUrl(u);
+    }, 20);
+    return () => { alive = false; clearTimeout(t); };
+  }, [key, enabled]);
+  return url;
+}
+
+function Tile({ job, img, onOpen, onLike }) {
+  // 목업 칸은 생성 중에도 그려 둔다 — 블러가 걷히며 드러나는 연출을 위해
+  const needMock = !img.src && (job.engine === 'mock' || img.fallback);
+  const mock = useArt(job, img, needMock);
+  const url = img.src || mock;
+  const a = arOf(job.params.ar);
+  const pct = Math.round(img.progress * 100);
+  const blur = img.done ? 0 : 3 + (1 - img.progress) * 26;
+  return (
+    <div className="tile" onClick={() => img.done && url && onOpen(job.id, img.id)}>
+      <div className="ph" style={{ paddingTop: (a.h / a.w * 100) + '%' }} />
+      {url && (
+        <img src={url} alt={job.prompt} loading="lazy"
+          style={{
+            filter: 'blur(' + blur + 'px) saturate(' + (0.55 + img.progress * 0.45) + ') brightness(' + (0.75 + img.progress * 0.25) + ')',
+            transform: img.done ? 'none' : 'scale(1.06)'
+          }} />
+      )}
+      {!img.done && (
+        <div className="prog">
+          <div className="pct">{pct}%</div>
+          <div className="bar"><i style={{ width: pct + '%' }} /></div>
+          <div className="label">{img.stage}</div>
+        </div>
+      )}
+      {img.done && <span className="badge">{(job.kind === 'upscale' ? img.label : 'U' + img.label) + (img.fallback ? ' · 목업' : '')}</span>}
+      {img.done && (
+        <button className={'heart' + (img.liked ? ' on' : '')} title="즐겨찾기"
+          onClick={e => { e.stopPropagation(); onLike(job.id, img.id); }}>{img.liked ? '♥' : '♡'}</button>
+      )}
+    </div>
+  );
+}
+
+function JobCard({ job, onOpen, onLike, onUpscale, onVary, onReroll, onRemove, onReuse }) {
+  const running = job.images.some(i => !i.done);
+  const doneCount = job.images.filter(i => i.done).length;
+  const opLabel = job.op === 'upscale' ? '업스케일' : job.op === 'vary' ? '변형' : '생성';
+  return (
+    <article className="job">
+      <header>
+        <div className="avatar">{job.op === 'upscale' ? '⤢' : job.op === 'vary' ? '✧' : '✦'}</div>
+        <div className="ptext">
+          {job.prompt} <em>{paramTag(job.params)}</em>
+          <div className="meta">
+            <span style={{ color: job.engine === 'fal' ? 'var(--brand-2)' : 'var(--faint)' }}>
+              {job.engine === 'fal' ? 'fal.ai · ' + modelOf(job.params.model).tag : '목업 캔버스'}
+            </span>
+            <span>{opLabel} {job.images.length}장</span>
+            <span>{resLabel(job.params.ar, job.images[0].scale)}</span>
+            <span>seed {job.seed}</span>
+            <span>{ago(job.createdAt)}</span>
+            {running && <span style={{ color: 'var(--warn)' }}>진행 {doneCount}/{job.images.length}</span>}
+          </div>
+          {job.error && (
+            <div style={{ marginTop: 8, fontSize: 12.5, color: '#FFB4B4', background: 'rgba(255,107,107,.08)', border: '1px solid rgba(255,107,107,.3)', borderRadius: 9, padding: '7px 10px' }}>
+              ⚠ {job.error}
+            </div>
+          )}
+        </div>
+        <button className="kill" title="삭제" onClick={() => onRemove(job.id)}>✕</button>
+      </header>
+
+      <div className={'grid ' + (job.images.length === 1 ? 'g1' : 'g4')}>
+        {job.images.map(img => <Tile key={img.id} job={job} img={img} onOpen={onOpen} onLike={onLike} />)}
+      </div>
+
+      <div className="actions">
+        {job.images.length > 1 ? (
+          <>
+            {job.images.map((im, i) => (
+              <button key={'u' + im.id} className="act" disabled={!im.done} onClick={() => onUpscale(job, im)}>U{i + 1}</button>
+            ))}
+            <div className="sep" />
+            {job.images.map((im, i) => (
+              <button key={'v' + im.id} className="act" disabled={!im.done} onClick={() => onVary(job, im)}>V{i + 1}</button>
+            ))}
+            <div className="sep" />
+            <button className="act pri wide" disabled={running} onClick={() => onReroll(job)}>🔄 다시 굴리기</button>
+            <button className="act wide" onClick={() => onReuse(job)}>프롬프트 가져오기</button>
+          </>
+        ) : (
+          <>
+            <button className="act pri wide" disabled={running} onClick={() => onVary(job, job.images[0])}>변형 4장</button>
+            <button className="act wide" disabled={!job.images[0].done} onClick={() => onOpen(job.id, job.images[0].id)}>크게 보기</button>
+            <button className="act wide" onClick={() => onReuse(job)}>프롬프트 가져오기</button>
+            {job.error && <button className="act wide" disabled={running} onClick={() => onReroll(job)}>다시 시도</button>}
+          </>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function Lightbox({ job, img, onClose, onLike, onUpscale, onVary, onToast }) {
+  const mock = useArt(job, img, !img.src);
+  const url = img.src || mock;
+  useEffect(() => {
+    const k = e => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [onClose]);
+  const copy = async (text, what) => {
+    try { await navigator.clipboard.writeText(text); onToast(what + ' 복사됨'); }
+    catch (e) { onToast('복사 실패 — 직접 선택해 주세요'); }
+  };
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="sheet" onClick={e => e.stopPropagation()}>
+        <button className="closer" onClick={onClose}>✕ 닫기</button>
+        <div className="view">{url ? <img src={url} alt={job.prompt} /> : <div style={{ color: 'var(--faint)' }}>렌더링 중…</div>}</div>
+        <aside>
+          <h3>{job.kind === 'upscale' ? '업스케일 ' + img.label : '이미지 ' + img.label + ' / ' + job.images.length}</h3>
+          <p className="pq">{job.prompt}</p>
+          <dl className="kv">
+            <dt>엔진</dt><dd>{img.fallback ? '목업(대체)' : job.engine === 'fal' ? 'fal.ai ' + modelOf(job.params.model).tag : '목업 캔버스'}</dd>
+            <dt>시드</dt><dd>{img.seed}</dd>
+            <dt>해상도</dt><dd>{resLabel(job.params.ar, img.scale)}</dd>
+            <dt>화면비</dt><dd>{job.params.ar}</dd>
+            <dt>스타일화</dt><dd>{job.params.stylize}</dd>
+            <dt>카오스</dt><dd>{job.params.chaos}</dd>
+            {job.params.no ? <><dt>제외</dt><dd>{job.params.no}</dd></> : null}
+            <dt>생성</dt><dd>{new Date(job.createdAt).toLocaleString('ko-KR')}</dd>
+          </dl>
+          <div className="actions" style={{ marginTop: 0 }}>
+            <button className="act wide" onClick={() => onLike(job.id, img.id)}>{img.liked ? '♥ 즐겨찾기 해제' : '♡ 즐겨찾기'}</button>
+            {img.scale === 1 && <button className="act wide pri" onClick={() => { onUpscale(job, img); onClose(); }}>⤢ 업스케일</button>}
+            <button className="act wide" onClick={() => { onVary(job, img); onClose(); }}>✧ 변형 4장</button>
+            <button className="act wide" onClick={() => copy(String(img.seed), '시드')}>시드 복사</button>
+            <button className="act wide" onClick={() => copy(job.prompt + ' ' + paramTag(job.params), '프롬프트')}>프롬프트 복사</button>
+            {url && <a className="act wide" style={{ textDecoration: 'none' }} href={url} target="_blank" rel="noreferrer"
+              download={'dreamcanvas-' + img.seed + '.png'}>⬇ 원본 열기 / 저장</a>}
+          </div>
+          <p style={{ fontSize: 11.5, color: 'var(--faint)', margin: 0, lineHeight: 1.6 }}>
+            {img.src
+              ? 'fal.ai 가 생성한 실제 이미지입니다. 링크는 fal 미디어 서버에 있으며 시간이 지나면 만료될 수 있습니다.'
+              : '서버에서 받아온 그림이 아니라 시드 ' + img.seed + ' 로 브라우저 캔버스에서 그린 목업입니다.'}
+          </p>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function Settings({ mode, setMode, health, onRecheck, onClose }) {
+  const [busy, setBusy] = useState(false);
+  const down = !health || health.down;
+  const recheck = async () => { setBusy(true); await onRecheck(); setBusy(false); };
+  const line = (label, value, color) => (
+    <div style={{ display: 'flex', gap: 10, fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--line-soft)' }}>
+      <span style={{ color: 'var(--faint)', width: 96, flex: 'none' }}>{label}</span>
+      <span style={{ color: color || 'var(--ink)' }}>{value}</span>
+    </div>
+  );
+  return (
+    <div className="modal" onClick={onClose}>
+      <div className="sheet" style={{ gridTemplateColumns: '1fr', maxWidth: 580 }} onClick={e => e.stopPropagation()}>
+        <button className="closer" onClick={onClose}>✕ 닫기</button>
+        <aside>
+          <h3>설정 · 서버 상태</h3>
+
+          <div>
+            <div style={{ fontSize: 12, color: 'var(--faint)', marginBottom: 6 }}>생성 엔진</div>
+            <div className="seg">
+              <button aria-pressed={mode === 'fal'} disabled={down || !health.hasKey}
+                onClick={() => setMode('fal')} style={{ padding: '7px 14px' }}>fal.ai 실연동</button>
+              <button aria-pressed={mode === 'mock'} onClick={() => setMode('mock')} style={{ padding: '7px 14px' }}>목업(오프라인)</button>
+            </div>
+          </div>
+
+          <div>
+            {line('프록시 서버', down ? '연결 안 됨' : '연결됨 (' + location.origin + ')', down ? '#FFB4B4' : 'var(--ok)')}
+            {line('FAL_KEY', down ? '확인 불가' : health.hasKey ? '설정됨 · ' + health.keyHint : '없음', down ? 'var(--faint)' : health.hasKey ? 'var(--ok)' : '#FFB4B4')}
+            {line('모델', down ? '—' : (health.models || []).map(m => m.label).join(', '))}
+            {line('브라우저 보관 키', '없음 (요청은 전부 서버가 대신 보냄)', 'var(--ok)')}
+          </div>
+
+          <div className="actions" style={{ marginTop: 0 }}>
+            <button className="act wide pri" disabled={busy} onClick={recheck}>{busy ? '확인 중…' : '다시 확인'}</button>
+          </div>
+
+          <div style={{ fontSize: 12, color: 'var(--faint)', lineHeight: 1.75 }}>
+            {down ? (
+              <>
+                <b style={{ color: 'var(--ink)' }}>실연동을 쓰려면</b> 이 폴더에서 서버를 띄우고 <b className="mono">http://localhost:8787</b> 로 접속하세요.
+                <pre className="mono" style={{ background: 'var(--panel-2)', border: '1px solid var(--line)', borderRadius: 10, padding: 10, fontSize: 11.5, overflowX: 'auto' }}>
+{`cp .env.example .env      # FAL_KEY=키아이디:시크릿
+node server.js            # → http://localhost:8787`}
+                </pre>
+                파일을 그냥 더블클릭(file://)해서 열면 서버가 없으므로 목업 모드만 동작합니다.
+              </>
+            ) : !health.hasKey ? (
+              <>
+                서버는 떠 있지만 <b className="mono">FAL_KEY</b> 환경변수가 비어 있습니다.
+                <b className="mono"> .env</b> 에 <b className="mono">FAL_KEY=키아이디:시크릿</b> 을 넣고 서버를 다시 실행하세요.
+                키는 <a href="https://fal.ai/dashboard/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--brand-2)' }}>fal.ai/dashboard/keys</a> 에서 발급합니다.
+              </>
+            ) : (
+              <>
+                키는 서버 프로세스의 환경변수에만 있습니다. 브라우저는 <b className="mono">/api/imagine</b> 만 호출하므로
+                개발자도구 네트워크 탭에도 키가 보이지 않습니다. <b className="mono">.env</b> 는 <b className="mono">.gitignore</b> 에 들어 있어 커밋되지 않습니다.
+              </>
+            )}
+          </div>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function PromptBar({ params, setParams, onSubmit, prompt, setPrompt, styles, toggleStyle, mode, setMode, busy, canFal }) {
+  const [focus, setFocus] = useState(false);
+  const submit = () => { if (prompt.trim()) onSubmit(); };
+  const set = (k, v) => setParams(p => Object.assign({}, p, { [k]: v }));
+  return (
+    <div className={'promptbar' + (focus ? ' focus' : '')}>
+      <div className="prow">
+        <span className="slash">/imagine</span>
+        <textarea
+          value={prompt}
+          placeholder="그리고 싶은 장면을 적어보세요 — 예: a neon alley at night, person with umbrella, wet asphalt reflections"
+          onChange={e => setPrompt(e.target.value)}
+          onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+        />
+        <button className="act" title="랜덤 아이디어" style={{ marginTop: 6 }}
+          onClick={() => setPrompt(IDEAS[Math.floor(Math.random() * IDEAS.length)])}>🎲</button>
+        <button className="gen" style={{ marginTop: 2 }} disabled={!prompt.trim()} onClick={submit}>
+          생성 <span className="mono" style={{ opacity: .7, fontSize: 12 }}>4장</span>
+        </button>
+      </div>
+      <div className="pfoot">
+        <div className="seg" role="group" aria-label="엔진">
+          <button aria-pressed={mode === 'fal'} disabled={!canFal} onClick={() => setMode('fal')}
+            style={canFal ? null : { opacity: .4, cursor: 'not-allowed' }}
+            title={canFal ? '서버를 거쳐 fal.ai 로 실제 생성' : '프록시 서버 또는 FAL_KEY 가 없습니다 (설정 참고)'}>fal.ai</button>
+          <button aria-pressed={mode === 'mock'} onClick={() => setMode('mock')} title="네트워크 없이 캔버스로 그리기">목업</button>
+        </div>
+        <div className="seg" role="group" aria-label="화면비">
+          {AR_LIST.map(a => <button key={a.id} aria-pressed={params.ar === a.id} onClick={() => set('ar', a.id)}>{a.id}</button>)}
+        </div>
+        <label className="field">모델
+          <select value={params.model} onChange={e => set('model', e.target.value)}>
+            {MODELS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
+          </select>
+        </label>
+        <label className="field">스타일화
+          <input type="range" min="0" max="1000" step="10" value={params.stylize} onChange={e => set('stylize', +e.target.value)} />
+          <b>{params.stylize}</b>
+        </label>
+        <label className="field">카오스
+          <input type="range" min="0" max="100" step="1" value={params.chaos} onChange={e => set('chaos', +e.target.value)} />
+          <b>{params.chaos}</b>
+        </label>
+        <label className="field">제외
+          <input type="text" placeholder="--no 텍스트, 워터마크" value={params.no} onChange={e => set('no', e.target.value)} />
+        </label>
+        {busy > 0 && <span style={{ fontSize: 12, color: 'var(--warn)' }}>진행 중 {busy}건</span>}
+      </div>
+      <div className="chips" style={{ padding: '0 12px 12px' }}>
+        {STYLE_CHIPS.map(s => (
+          <button key={s.id} className="chip" aria-pressed={styles.includes(s.id)} onClick={() => toggleStyle(s.id)}>{s.label}</button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [tab, setTab] = useState('create');
+  const [jobs, setJobs] = useState(seedJobs);
+  const [prompt, setPrompt] = useState('');
+  const [styles, setStyles] = useState([]);
+  const [params, setParams] = useState({ ar: '16:9', stylize: 250, chaos: 0, model: 'schnell', no: '' });
+  const [mode, setMode] = useState(() => localStorage.getItem(LS_MODE) || 'fal');
+  const [health, setHealth] = useState(null);
+  const [settings, setSettings] = useState(false);
+  const [open, setOpen] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [calls, setCalls] = useState(0);
+  const [, tick] = useState(0);
+
+  useEffect(() => { localStorage.setItem(LS_MODE, mode); }, [mode]);
+
+  const say = useCallback(msg => {
+    setToast(msg);
+    setTimeout(() => setToast(t => (t === msg ? null : t)), 2600);
+  }, []);
+
+  /* 서버가 떠 있는지 · 키가 꽂혀 있는지 확인. 없으면 목업으로 내려간다. */
+  const checkHealth = useCallback(async (quiet) => {
+    try {
+      const h = await API.health();
+      setHealth(h);
+      if (!h.hasKey) {
+        setMode('mock');
+        if (!quiet) say('서버에 FAL_KEY 가 없어 목업 모드로 전환했습니다');
+      }
+      return h;
+    } catch (e) {
+      setHealth({ down: true });
+      setMode('mock');
+      if (!quiet) say('프록시 서버에 연결할 수 없어 목업 모드로 전환했습니다');
+      return null;
+    }
+  }, [say]);
+  useEffect(() => { checkHealth(true); }, [checkHealth]);
+
+  const patchImg = useCallback((jobId, imgId, patch) => {
+    setJobs(js => js.map(j => j.id !== jobId ? j : Object.assign({}, j, {
+      images: j.images.map(im => im.id !== imgId ? im : Object.assign({}, im, patch))
+    })));
+  }, []);
+  const patchJob = useCallback((jobId, patch) => {
+    setJobs(js => js.map(j => j.id !== jobId ? j : Object.assign({}, j, patch)));
+  }, []);
+
+  /* 진행률: 목업은 타이머로 끝까지, 실연동은 응답 오기 전까지 92% 에서 대기 */
+  useEffect(() => {
+    const t = setInterval(() => {
+      setJobs(js => {
+        let changed = false;
+        const next = js.map(j => {
+          if (!j.images.some(i => !i.done)) return j;
+          changed = true;
+          return Object.assign({}, j, {
+            images: j.images.map(im => {
+              if (im.done) return im;
+              const cap = im.cap == null ? 1 : im.cap;
+              const p = clamp(im.progress + im.speed * (0.5 + Math.random()), 0, cap);
+              const stage = cap < 1 ? im.stage : (p < 0.08 ? '대기열' : p < 0.45 ? '노이즈 제거' : p < 0.85 ? '디테일 강화' : '마무리');
+              return Object.assign({}, im, { progress: p, stage, done: p >= 1 });
+            })
+          });
+        });
+        return changed ? next : js;
+      });
+    }, 150);
+    return () => clearInterval(t);
+  }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => tick(x => x + 1), 30000);
+    return () => clearInterval(t);
+  }, []);
+
+  /* ---------- 실연동: 타일 1장 = 서버 요청 1건 ---------- */
+  const runFal = useCallback(async job => {
+    const m = modelOf(job.params.model);
+    setCalls(c => c + job.images.length);
+
+    const one = async img => {
+      const onStatus = st => {
+        if (st.status === 'IN_QUEUE') {
+          patchImg(job.id, img.id, { stage: '대기열' + (st.queue_position != null ? ' ' + st.queue_position + '번' : '') });
+        } else if (st.status === 'IN_PROGRESS') {
+          patchImg(job.id, img.id, { stage: '생성 중' });
+          setJobs(js => js.map(j => j.id !== job.id ? j : Object.assign({}, j, {
+            images: j.images.map(x => x.id !== img.id || x.done ? x : Object.assign({}, x, { progress: Math.max(0.3, x.progress) }))
+          })));
+        }
+      };
+      let payload;
+      if (job.op === 'upscale') payload = { op: 'upscale', image_url: job.srcUrl };
+      else if (job.op === 'vary') payload = {
+        op: 'vary', image_url: job.srcUrl, prompt: finalPrompt(job.prompt, job.params),
+        seed: img.seed, strength: 0.6 + (job.params.chaos / 100) * 0.3
+      };
+      else payload = {
+        op: 'text', model: m.server, prompt: finalPrompt(job.prompt, job.params),
+        image_size: SIZE_MAP[job.params.ar] || 'square_hd', seed: img.seed,
+        guidance_scale: 2.5 + (job.params.stylize / 1000) * 5.5
+      };
+      try {
+        const url = await apiRun(payload, onStatus);
+        patchImg(job.id, img.id, { src: url, progress: 1, done: true, cap: 1, stage: '완료' });
+      } catch (e) {
+        patchJob(job.id, { error: e.message });
+        patchImg(job.id, img.id, { fallback: true, progress: 1, done: true, cap: 1, stage: '실패' });
+      }
+    };
+    await Promise.all(job.images.map(one));
+  }, [patchImg, patchJob]);
+
+  const push = (job, note) => {
+    setJobs(js => [job].concat(js));
+    setTab('create');
+    if (note) say(note);
+    if (job.engine === 'fal') runFal(job);
+  };
+
+  const fullPrompt = useMemo(() => {
+    const extra = styles.map(id => (STYLE_CHIPS.find(s => s.id === id) || {}).suffix).filter(Boolean);
+    return [prompt.trim()].concat(extra).filter(Boolean).join(', ');
+  }, [prompt, styles]);
+
+  const generate = () => {
+    if (!fullPrompt) return;
+    push(newJob(fullPrompt, Object.assign({}, params), { engine: mode }),
+      mode === 'fal' ? 'fal.ai 에 4건 요청했습니다' : '목업 4장을 그립니다');
+  };
+  const reroll = job => {
+    push(newJob(job.prompt, Object.assign({}, job.params), {
+      engine: job.engine, op: job.op, srcUrl: job.srcUrl,
+      count: job.images.length, scale: job.images[0].scale, label: job.images[0].label
+    }), '같은 설정으로 다시 실행합니다');
+  };
+  const upscale = (job, img) => {
+    const canFal = job.engine === 'fal' && !!img.src;
+    push(newJob(job.prompt, Object.assign({}, job.params), {
+      engine: canFal ? 'fal' : 'mock', op: canFal ? 'upscale' : 'text',
+      kind: 'upscale', count: 1, seed: img.seed, scale: 2,
+      label: 'U' + (img.index + 1), srcUrl: img.src, from: job.id
+    }), canFal ? 'fal.ai 업스케일(ESRGAN ×2) 요청' : '목업 고해상도 렌더');
+  };
+  const vary = (job, img) => {
+    const canFal = job.engine === 'fal' && !!img.src;
+    push(newJob(job.prompt, Object.assign({}, job.params), {
+      engine: canFal ? 'fal' : 'mock', op: canFal ? 'vary' : 'text',
+      seed: (img.seed + 131) >>> 0, srcUrl: img.src, from: job.id
+    }), canFal ? 'fal.ai 이미지→이미지 변형 4장' : '목업 변형 4장');
+  };
+  const like = (jobId, imgId) => setJobs(js => js.map(j => j.id !== jobId ? j : Object.assign({}, j, {
+    images: j.images.map(im => im.id !== imgId ? im : Object.assign({}, im, { liked: !im.liked }))
+  })));
+  const remove = jobId => { setJobs(js => js.filter(j => j.id !== jobId)); setOpen(null); say('작업을 지웠습니다'); };
+  const reuse = job => {
+    setPrompt(job.prompt);
+    setParams(Object.assign({}, job.params));
+    setStyles([]);
+    setTab('create');
+    say('프롬프트와 설정을 불러왔습니다');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  const toggleStyle = id => setStyles(s => s.includes(id) ? s.filter(x => x !== id) : s.concat(id));
+
+  const allDone = useMemo(() => {
+    const out = [];
+    jobs.forEach(j => j.images.forEach(im => { if (im.done) out.push({ job: j, img: im }); }));
+    return out;
+  }, [jobs]);
+  const liked = allDone.filter(x => x.img.liked);
+  const openPair = useMemo(() => {
+    if (!open) return null;
+    const j = jobs.find(x => x.id === open.jobId);
+    if (!j) return null;
+    const im = j.images.find(x => x.id === open.imgId);
+    return im ? { job: j, img: im } : null;
+  }, [open, jobs]);
+  const running = jobs.filter(j => j.images.some(i => !i.done)).length;
+  const canFal = !!(health && !health.down && health.hasKey);
+
+  return (
+    <div className="app">
+      <nav className="side">
+        <div className="brand">
+          <div className="mark">✦</div>
+          <div>
+            <h1>드림캔버스</h1>
+            <small>{mode === 'fal' ? 'fal.ai · FLUX.1' : 'mock studio'}</small>
+          </div>
+        </div>
+
+        <div className="nav">
+          <button aria-current={tab === 'create'} onClick={() => setTab('create')}>
+            <span>🎨</span> 생성 <span className="count">{jobs.length}</span>
+          </button>
+          <button aria-current={tab === 'gallery'} onClick={() => setTab('gallery')}>
+            <span>🖼</span> 갤러리 <span className="count">{allDone.length}</span>
+          </button>
+          <button aria-current={tab === 'liked'} onClick={() => setTab('liked')}>
+            <span>♥</span> 즐겨찾기 <span className="count">{liked.length}</span>
+          </button>
+          <button onClick={() => setSettings(true)}><span>⚙</span> 설정 · 키</button>
+        </div>
+
+        <div>
+          <h2>엔진</h2>
+          <div className="credits">
+            <div className="num" style={{ fontSize: 17 }}>{mode === 'fal' ? 'fal.ai 실연동' : '목업 모드'}</div>
+            <div className="track"><i style={{ width: mode === 'fal' ? '100%' : '38%' }} /></div>
+            <div style={{ fontSize: 11.5, color: 'var(--faint)', marginTop: 8, lineHeight: 1.6 }}>
+              {mode === 'fal'
+                ? '서버 경유 요청 ' + calls + '건 · 실제 fal.ai 크레딧 차감'
+                : '네트워크 요청 0건 · 캔버스로 직접 그립니다'}
+              {running ? ' · 진행 중 ' + running + '건' : ''}
+            </div>
+            <button className="act wide" style={{ marginTop: 10, width: '100%' }} onClick={() => setSettings(true)}>
+              {health == null ? '서버 확인 중…' : health.down ? '⚠ 서버 연결 안 됨' : health.hasKey ? '✔ FAL_KEY 설정됨' : '⚠ FAL_KEY 없음'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h2>최근 프롬프트</h2>
+          <div className="recent">
+            {jobs.slice(0, 6).map(j => <button key={j.id} title={j.prompt} onClick={() => reuse(j)}>{j.prompt}</button>)}
+            {!jobs.length && <div style={{ fontSize: 12, color: 'var(--faint)' }}>아직 없음</div>}
+          </div>
+        </div>
+
+        <div className="fakenote">
+          <b>{mode === 'fal' ? '실연동' : '목업'}</b> —{' '}
+          {mode === 'fal'
+            ? '브라우저는 /api/imagine 만 호출하고, 키를 가진 server.js 가 fal.ai 에 대신 요청합니다. 실패한 칸은 목업 그림으로 대체됩니다.'
+            : '네트워크 요청 없이 프롬프트 키워드로 팔레트를 고르고 시드 난수로 캔버스에 그립니다.'}
+        </div>
+      </nav>
+
+      <main className="main">
+        <div className="topbar">
+          {tab === 'create' ? (
+            <PromptBar
+              params={params} setParams={setParams} prompt={prompt} setPrompt={setPrompt}
+              styles={styles} toggleStyle={toggleStyle} onSubmit={generate}
+              mode={mode} setMode={setMode} busy={running} canFal={canFal}
+            />
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <h2 style={{ margin: 0, fontSize: 15, textTransform: 'none', letterSpacing: 0, color: 'var(--ink)' }}>
+                {tab === 'gallery' ? '갤러리' : '즐겨찾기'}
+              </h2>
+              <span style={{ fontSize: 12.5, color: 'var(--faint)' }}>
+                {(tab === 'gallery' ? allDone.length : liked.length)}장 · 클릭하면 크게 보기
+              </span>
+              <button className="act wide" style={{ marginLeft: 'auto' }} onClick={() => setTab('create')}>+ 새로 생성</button>
+            </div>
+          )}
+        </div>
+
+        <div className="content">
+          {tab === 'create' && (
+            jobs.length ? jobs.map(j => (
+              <JobCard key={j.id} job={j} onOpen={(jobId, imgId) => setOpen({ jobId, imgId })}
+                onLike={like} onUpscale={upscale} onVary={vary} onReroll={reroll} onRemove={remove} onReuse={reuse} />
+            )) : (
+              <div className="empty">
+                <div className="big">✦</div>
+                <div style={{ marginBottom: 14 }}>아직 만든 이미지가 없습니다. 아이디어를 하나 골라보세요.</div>
+                <div className="chips" style={{ justifyContent: 'center' }}>
+                  {IDEAS.slice(0, 5).map(t => <button key={t} className="chip" onClick={() => setPrompt(t)}>{t}</button>)}
+                </div>
+              </div>
+            )
+          )}
+
+          {tab !== 'create' && (
+            (tab === 'gallery' ? allDone : liked).length ? (
+              <div className="gal">
+                {(tab === 'gallery' ? allDone : liked).map(x => (
+                  <GalleryItem key={x.img.id} job={x.job} img={x.img} onOpen={() => setOpen({ jobId: x.job.id, imgId: x.img.id })} />
+                ))}
+              </div>
+            ) : (
+              <div className="empty">
+                <div className="big">{tab === 'gallery' ? '🖼' : '♡'}</div>
+                {tab === 'gallery' ? '완성된 이미지가 없습니다.' : '하트를 누른 이미지가 여기 모입니다.'}
+              </div>
+            )
+          )}
+        </div>
+      </main>
+
+      {openPair && (
+        <Lightbox job={openPair.job} img={openPair.img} onClose={() => setOpen(null)}
+          onLike={like} onUpscale={upscale} onVary={vary} onToast={say} />
+      )}
+      {settings && (
+        <Settings mode={mode} setMode={setMode} health={health}
+          onRecheck={() => checkHealth(false)} onClose={() => setSettings(false)} />
+      )}
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+function GalleryItem({ job, img, onOpen }) {
+  const mock = useArt(job, img, !img.src);
+  const url = img.src || mock;
+  const a = arOf(job.params.ar);
+  return (
+    <figure onClick={onOpen}>
+      {url ? <img src={url} alt={job.prompt} loading="lazy" />
+        : <div style={{ paddingTop: (a.h / a.w * 100) + '%', background: '#0F1117' }} />}
+      <figcaption>{img.liked ? '♥ ' : ''}{job.prompt}</figcaption>
+    </figure>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
