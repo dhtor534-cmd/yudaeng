@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>week4 — 이번 주 만든 것</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap" />
+<style>
+  :root {
+    --bg: #f6f8fc; --ink: #17213c; --navy: #182d69;
+    --brand: #254bdb; --brand-ink: #18349f; --brand-soft: #edf2ff;
+    --paper: #fff; --line: #dce2ec; --line-soft: #e8ecf3;
+    --dim: #52637e; --faint: #8992a3; --ok: #2f9e6b; --warn: #b87b1f;
+    --r: 16px; --shadow: 0 18px 44px -30px rgba(24,45,105,.45);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "DM Sans", "Noto Sans KR", system-ui, -apple-system, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  a { color: inherit; text-decoration: none; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 56px 22px 80px; }
+
+  .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--brand); }
+  h1 { font-size: 34px; font-weight: 700; letter-spacing: -1px; margin: 10px 0 10px; }
+  .lead { color: var(--dim); font-size: 14.5px; margin: 0 0 34px; line-height: 1.8; }
+
+  .grid { display: grid; gap: 14px; }
+  .item {
+    display: block; background: var(--paper); border: 1px solid var(--line-soft); border-radius: var(--r);
+    padding: 20px 22px; transition: .16s;
+  }
+  .item:hover { border-color: var(--brand); box-shadow: var(--shadow); transform: translateY(-1px); }
+  .item .head { display: flex; align-items: center; gap: 11px; flex-wrap: wrap; }
+  .item .ico {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; flex: none;
+    background: var(--brand-soft); font-size: 17px;
+  }
+  .item h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+  .item .tags { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
+  .tag { font-size: 11px; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--line); color: var(--faint); }
+  .tag.ok { color: var(--ok); border-color: #cfe9dc; background: #f1f9f5; }
+  .tag.need { color: var(--warn); border-color: #f0e0c2; background: #fdf7ec; }
+  .item p { margin: 11px 0 0; font-size: 13.5px; color: var(--dim); line-height: 1.75; }
+  .item .run { margin-top: 12px; font-size: 12px; color: var(--faint); font-family: "IBM Plex Mono", monospace; }
+  .item .run b { color: var(--brand-ink); font-weight: 500; }
+
+  footer { margin-top: 40px; padding-top: 22px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--faint); line-height: 1.9; }
+  footer code { font-family: "IBM Plex Mono", monospace; background: #fff; border: 1px solid var(--line); border-radius: 5px; padding: 1px 6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">week 4</div>
+  <h1>이번 주 만든 것</h1>
+  <p class="lead">
+    전부 빌드 없이 도는 단일 페이지 앱입니다. 화면은 React 18 + Babel 을 CDN 으로 불러 쓰고,
+    저장이 필요한 것만 Node 서버(표준 모듈 + <span class="mono">pg</span>)를 함께 둡니다.<br />
+    <span class="mono">서버 필요</span> 표시가 있는 것은 해당 폴더에서 <code style="font-family:'IBM Plex Mono',monospace">node server.js</code> 를 실행한 뒤 열어야 저장까지 동작합니다.
+  </p>
+
+  <div class="grid">
+    <a class="item" href="catfood/index.html">
+      <div class="head">
+        <span class="ico">🐈</span>
+        <h2>하루한끼 캣푸드</h2>
+        <span class="tags">
+          <span class="tag">상품페이지</span>
+          <span class="tag need">문의 저장은 서버+DB</span>
+        </span>
+      </div>
+      <p>
+        고양이 사료 상품 상세페이지와 문의하기 폼. 사료 봉투는 이미지 파일 없이 SVG 로 그려서 맛에 따라 색이 바뀌고,
+        용량·수량에 따라 총액이 실시간으로 계산됩니다. 문의는 PostgreSQL 에 저장되고 접수번호를 돌려줍니다.
+      </p>
+      <div class="run">폴더 <b>catfood/</b> · 서버 <b>node server.js</b> → localhost:8790 · 관리자 <b>admin.html</b></div>
+    </a>
+
+    <a class="item" href="todo01/index.html">
+      <div class="head">
+        <span class="ico">✓</span>
+        <h2>todo01 — 텍스트 파일 저장</h2>
+        <span class="tags"><span class="tag need">서버 필요</span></span>
+      </div>
+      <p>
+        할 일을 적으면 그 자리에서 <span class="mono">data/todos.txt</span> 한 줄로 저장됩니다.
+        그 파일이 원본이라 메모장으로 직접 고쳐도 서버가 그대로 읽습니다.
+      </p>
+      <div class="run">폴더 <b>todo01/</b> · 서버 <b>node server.js</b> → localhost:8788</div>
+    </a>
+
+    <a class="item" href="todo02/index.html">
+      <div class="head">
+        <span class="ico">🗃</span>
+        <h2>todo02 — PostgreSQL 저장</h2>
+        <span class="tags"><span class="tag need">서버 + DB 필요</span></span>
+      </div>
+      <p>
+        같은 투두를 파일 대신 DB 테이블에 넣습니다. 검색은 SQL 의 <span class="mono">ILIKE</span> 로 처리하고,
+        저장된 행을 화면 아래에서 그대로 볼 수 있습니다.
+      </p>
+      <div class="run">폴더 <b>todo02/</b> · <b>npm install</b> → <b>node server.js</b> → localhost:8789</div>
+    </a>
+
+    <a class="item" href="이미지생성기/index.html">
+      <div class="head">
+        <span class="ico">✦</span>
+        <h2>드림캔버스 — 이미지 생성기</h2>
+        <span class="tags"><span class="tag ok">그냥 열면 동작</span></span>
+      </div>
+      <p>
+        미드저니식 프롬프트 이미지 생성기. 목업 엔진은 네트워크 없이 프롬프트 키워드로 팔레트를 고르고
+        시드 난수로 캔버스에 직접 그립니다 — 같은 시드면 언제나 같은 그림. fal.ai 실연동은 서버가 키를 들고 대신 호출합니다.
+      </p>
+      <div class="run">폴더 <b>이미지생성기/</b> · 실연동만 <b>node server.js</b> → localhost:8787</div>
+    </a>
+
+    <a class="item" href="포켓몬도감/index.html">
+      <div class="head">
+        <span class="ico">🔴</span>
+        <h2>전국도감</h2>
+        <span class="tags"><span class="tag need">서버 필요</span></span>
+      </div>
+      <p>
+        PokéAPI 에서 받아둔 데이터를 내부 서버로 돌려주는 도감. 1000마리 목록과 진화 계통, 종족값을 봅니다.
+      </p>
+      <div class="run">폴더 <b>포켓몬도감/</b> · 서버 <b>node server.js</b> → localhost:8000</div>
+    </a>
+  </div>
+
+  <footer>
+    저장소 <code>github.com/dhtor534-cmd/yudaeng</code> · week4<br />
+    각 폴더의 <code>README.md</code> 에 실행법과 API 정리가 있습니다.
+    비밀 값은 전부 <code>.env</code> 에만 두고 커밋하지 않습니다.
+  </footer>
+</div>
+</body>
+</html>

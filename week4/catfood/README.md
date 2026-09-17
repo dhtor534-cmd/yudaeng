@@ -35,6 +35,15 @@ node server.js                # → http://localhost:8790
   - 접수되면 **접수번호**(`2026-0917-0007`)를 보여준다
   - 옆에 **최근 문의**가 뜨지만 이름·이메일은 가려서(`홍**`, `ho**@example.com`) 보여주고 본문은 공개하지 않는다
 
+## 관리자 페이지 — `admin.html`
+
+`http://localhost:8790/admin.html` 에서 접수된 문의를 보고 처리 상태를 바꾼다.
+
+- 처음 한 번 `ADMIN_TOKEN` 을 입력하면 그 브라우저의 localStorage 에만 저장된다 (서버는 헤더로 받은 값만 본다)
+- 문의마다 접수번호 · 이름 · 이메일 · 연락처 · 문의 유형 · 보고 있던 옵션 · 본문을 전부 보여준다
+- **접수 / 처리중 / 답변완료** 를 눌러 바로 상태를 바꾸고, `메일로 답장` 은 접수번호가 제목에 들어간 메일 창을 연다
+- 토큰이 없거나 틀리면 목록이 아예 내려오지 않는다 (`401`)
+
 ## 테이블
 
 ```sql
@@ -62,6 +71,7 @@ CREATE TABLE IF NOT EXISTS inquiries (
 | POST | `/api/inquiries` | 문의 접수 → `{ ticket, created, topic }` |
 | GET | `/api/inquiries?recent=1` | 최근 5건 (이름·이메일 마스킹, 본문 없음) |
 | GET | `/api/inquiries` | 전체 목록 — 헤더 `x-admin-token` 필요 |
+| PATCH | `/api/inquiries?id=3` | `{ status }` 처리 상태 변경 — 관리자 토큰 필요 |
 
 입력은 서버에서 다시 검증한다 — 이메일 형식, 연락처 문자, 5자 미만 내용, 동의 여부.
 틀리면 `400` 과 함께 `{ errors: { email: "...", message: "..." } }` 를 돌려주고 폼이 칸별로 표시한다.

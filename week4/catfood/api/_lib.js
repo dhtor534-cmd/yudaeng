@@ -101,6 +101,14 @@ function rateLimited(ip) {
   return false;
 }
 
+/* 관리자 확인 — 토큰이 없거나 틀리면 여기서 끊는다 */
+function requireAdmin(req, url) {
+  const need = (process.env.ADMIN_TOKEN || "").trim();
+  if (!need) throw Object.assign(new Error("ADMIN_TOKEN 이 설정되지 않아 관리자 기능이 잠겨 있습니다."), { status: 503 });
+  const got = String(req.headers["x-admin-token"] || url.searchParams.get("token") || "");
+  if (got !== need) throw Object.assign(new Error("관리자 토큰이 필요합니다."), { status: 401 });
+}
+
 /* ---------- 핸들러 ---------- */
 async function health(req, res) {
   let connected = false, detail = null, stats = { total: 0, answered: 0 };
@@ -146,12 +154,19 @@ async function inquiries(req, res) {
     if (url.searchParams.get("recent")) {
       return json(res, 200, { recent: await store.recentPublic(5), stats: await store.stats() });
     }
-    // 전체 목록은 관리자 토큰이 있어야 준다
-    const need = (process.env.ADMIN_TOKEN || "").trim();
-    if (!need) return json(res, 503, { detail: "ADMIN_TOKEN 이 설정되지 않아 목록을 볼 수 없습니다." });
-    const got = String(req.headers["x-admin-token"] || url.searchParams.get("token") || "");
-    if (got !== need) return json(res, 401, { detail: "관리자 토큰이 필요합니다." });
+    requireAdmin(req, url);                      // 전체 목록은 관리자만
     return json(res, 200, { inquiries: await store.list(url.searchParams.get("limit")), stats: await store.stats() });
+  }
+
+  /* 관리자 답변 처리: PATCH /api/inquiries?id=3  { status: "답변완료" } */
+  if (req.method === "PATCH") {
+    await ensureReady();
+    requireAdmin(req, url);
+    const id = url.searchParams.get("id");
+    if (!/^\d+$/.test(String(id || ""))) return json(res, 400, { detail: "id 가 필요합니다." });
+    const body = await readJson(req);
+    const updated = await store.setStatus(id, body.status);
+    return json(res, 200, { updated, inquiries: await store.list(url.searchParams.get("limit")), stats: await store.stats() });
   }
 
   return json(res, 405, { detail: "지원하지 않는 메서드" });

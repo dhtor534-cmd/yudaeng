@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>하루한끼 · 문의 관리</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap" />
+<style>
+  :root {
+    --cream: #FDF8F1; --paper: #fff; --soft: #FDEEE4;
+    --ink: #2B2019; --dim: #7A6A5E; --faint: #A99A8D;
+    --line: #EDE3D7; --line-soft: #F4ECE2;
+    --brand: #E2703A; --brand-ink: #C4551F; --sage: #5C8A6B; --danger: #C4453B;
+    --shadow: 0 20px 50px -34px rgba(74,48,30,.5);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--cream); color: var(--ink);
+    font-family: "Noto Sans KR", "DM Sans", system-ui, sans-serif; line-height: 1.6; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .num { font-family: "DM Sans", sans-serif; font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 34px 22px 70px; }
+
+  header.h { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  header.h .m { width: 32px; height: 32px; border-radius: 10px; background: var(--brand); display: grid; place-items: center; color: #fff; font-size: 15px; font-weight: 700; }
+  header.h h1 { margin: 0; font-size: 20px; letter-spacing: -.4px; }
+  .sub { color: var(--faint); font-size: 12.5px; margin: 0 0 24px 44px; }
+  .sub a { color: var(--brand-ink); }
+
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; background: var(--paper);
+    border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-bottom: 18px; }
+  .bar input {
+    flex: 1; min-width: 200px; border: 1px solid var(--line); border-radius: 11px; padding: 10px 12px;
+    outline: none; font-size: 13.5px; font-family: "DM Sans", monospace;
+  }
+  .bar input:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(226,112,58,.13); }
+  .bar button { border: 0; border-radius: 11px; padding: 10px 18px; background: var(--brand); color: #fff; font-weight: 700; font-size: 13.5px; }
+  .bar button:hover:not(:disabled) { background: var(--brand-ink); }
+  .bar button:disabled { background: #E6D7C8; cursor: not-allowed; }
+  .bar .ghost { background: #fff; color: var(--dim); border: 1px solid var(--line); font-weight: 400; }
+  .bar .ghost:hover { border-color: var(--brand); color: var(--brand-ink); background: var(--soft); }
+
+  .stats { display: flex; gap: 10px; margin-bottom: 18px; }
+  .stat { flex: 1; background: var(--paper); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+  .stat .k { font-size: 11.5px; color: var(--faint); }
+  .stat .v { font-size: 22px; font-weight: 700; letter-spacing: -.5px; }
+
+  .note { border-radius: 12px; padding: 13px 15px; font-size: 13px; line-height: 1.7; margin-bottom: 16px; }
+  .note.err { background: #FDF0EF; border: 1px solid #F2D4D1; color: #9A3B32; }
+  .note.warn { background: #FDF3E8; border: 1px solid #F1DCC2; color: #8A5A22; }
+  .note code { background: rgba(0,0,0,.05); padding: 1px 6px; border-radius: 5px; font-family: "DM Sans", monospace; }
+
+  .list { display: flex; flex-direction: column; gap: 12px; }
+  .row { background: var(--paper); border: 1px solid var(--line); border-radius: 16px; padding: 18px; box-shadow: var(--shadow); }
+  .row .top { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .row .tk { font-family: "DM Sans", monospace; font-size: 12.5px; font-weight: 700; color: var(--brand-ink); background: var(--soft); border-radius: 8px; padding: 2px 9px; }
+  .row .who { font-weight: 700; font-size: 14.5px; }
+  .row .meta { font-size: 12px; color: var(--faint); font-family: "DM Sans", monospace; }
+  .row .msg { font-size: 14px; color: var(--ink); background: #FCF8F3; border: 1px solid var(--line-soft); border-radius: 12px; padding: 13px 15px; white-space: pre-wrap; margin: 10px 0 12px; }
+  .row .foot { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chipset { display: flex; gap: 6px; }
+  .chipset button {
+    border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 5px 13px; font-size: 12.5px; color: var(--dim);
+  }
+  .chipset button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 500; }
+  .chipset button:hover:not([aria-pressed="true"]) { border-color: var(--brand); color: var(--brand-ink); }
+  .row a.mail { margin-left: auto; font-size: 12.5px; color: var(--dim); text-decoration: none; border: 1px solid var(--line); border-radius: 9px; padding: 5px 12px; }
+  .row a.mail:hover { border-color: var(--brand); color: var(--brand-ink); }
+  .tag { font-size: 11.5px; border-radius: 999px; padding: 2px 10px; background: var(--soft); color: var(--brand-ink); }
+  .tag.opt { background: #EFF3EF; color: var(--sage); }
+
+  .empty { text-align: center; color: var(--faint); padding: 50px 20px; border: 1px dashed var(--line); border-radius: 16px; font-size: 13.5px; }
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff;
+    border-radius: 12px; padding: 10px 18px; font-size: 13px; }
+  @media (max-width: 640px) { .stats { flex-direction: column; } .wrap { padding: 22px 14px 60px; } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback } = React;
+const LS = 'haruhankki.adminToken';
+const STATUSES = ['접수', '처리중', '답변완료'];
+
+/* 토큰은 이 브라우저에만 둔다. 서버는 헤더로 받은 값만 본다. */
+async function api(path, token, options) {
+  const res = await fetch('api/' + path, Object.assign({ cache: 'no-store' }, options, {
+    headers: Object.assign(
+      { 'x-admin-token': token },
+      options && options.body ? { 'Content-Type': 'application/json' } : {}
+    )
+  }));
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error((data && data.detail) || ('서버 오류 ' + res.status));
+  return data;
+}
+
+function App() {
+  const [token, setToken] = useState(() => localStorage.getItem(LS) || '');
+  const [draft, setDraft] = useState(() => localStorage.getItem(LS) || '');
+  const [rows, setRows] = useState([]);
+  const [stats, setStats] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+  const [health, setHealth] = useState(null);
+
+  const say = useCallback(m => { setToast(m); setTimeout(() => setToast(t => (t === m ? null : t)), 1800); }, []);
+
+  useEffect(() => {
+    fetch('api/health', { cache: 'no-store' }).then(r => r.json()).then(setHealth).catch(() => setHealth({ connected: false }));
+  }, []);
+
+  const load = useCallback(async (t) => {
+    const key = (t == null ? token : t).trim();
+    if (!key) { setError('관리자 토큰을 입력하세요.'); return; }
+    setLoading(true); setError(null);
+    try {
+      const data = await api('inquiries', key);
+      setRows(data.inquiries || []);
+      setStats(data.stats || null);
+      setToken(key);
+      localStorage.setItem(LS, key);
+    } catch (e) { setError(e.message); setRows([]); }
+    setLoading(false);
+  }, [token]);
+
+  useEffect(() => { if (token) load(token); }, []);
+
+  const setStatus = async (row, status) => {
+    if (row.status === status) return;
+    try {
+      const data = await api('inquiries?id=' + row.id, token, { method: 'PATCH', body: JSON.stringify({ status }) });
+      setRows(data.inquiries || []);
+      setStats(data.stats || null);
+      say(row.ticket + ' → ' + status);
+    } catch (e) { setError(e.message); }
+  };
+
+  const dbOff = health && !health.connected;
+
+  return (
+    <div className="wrap">
+      <header className="h">
+        <div className="m">🐈</div>
+        <h1>문의 관리</h1>
+      </header>
+      <p className="sub">
+        접수된 문의를 보고 처리 상태를 바꿉니다. <a href="index.html">← 상품페이지</a>
+      </p>
+
+      <div className="bar">
+        <input type="password" value={draft} onChange={e => setDraft(e.target.value)} spellCheck="false"
+          placeholder="ADMIN_TOKEN"
+          onKeyDown={e => { if (e.key === 'Enter') load(draft); }} />
+        <button onClick={() => load(draft)} disabled={loading || !draft.trim()}>{loading ? '불러오는 중…' : '불러오기'}</button>
+        <button className="ghost" onClick={() => { localStorage.removeItem(LS); setToken(''); setDraft(''); setRows([]); setStats(null); say('토큰을 지웠습니다'); }}>토큰 지우기</button>
+      </div>
+
+      {dbOff && (
+        <div className="note warn">
+          ⚠ DB 가 연결되지 않았습니다 — 서버에 <code>DATABASE_URL</code> 을 넣고 다시 실행하세요.
+          {health && health.detail ? <><br />{health.detail}</> : null}
+        </div>
+      )}
+      {error && <div className="note err">⚠ {error}</div>}
+
+      {stats && (
+        <div className="stats">
+          <div className="stat"><div className="k">전체 문의</div><div className="v num">{stats.total}</div></div>
+          <div className="stat"><div className="k">답변 완료</div><div className="v num">{stats.answered}</div></div>
+          <div className="stat"><div className="k">남은 문의</div><div className="v num">{stats.total - stats.answered}</div></div>
+        </div>
+      )}
+
+      {rows.length ? (
+        <div className="list">
+          {rows.map(r => (
+            <div className="row" key={r.id}>
+              <div className="top">
+                <span className="tk">{r.ticket}</span>
+                <span className="who">{r.name}</span>
+                <span className="tag">{r.topic}</span>
+                {r.option && <span className="tag opt">{r.option}</span>}
+                <span className="meta">{r.created}</span>
+              </div>
+              <div className="meta">{r.email}{r.phone ? ' · ' + r.phone : ''}</div>
+              <div className="msg">{r.message}</div>
+              <div className="foot">
+                <div className="chipset">
+                  {STATUSES.map(s => (
+                    <button key={s} aria-pressed={r.status === s} onClick={() => setStatus(r, s)}>{s}</button>
+                  ))}
+                </div>
+                <a className="mail" href={'mailto:' + r.email + '?subject=' + encodeURIComponent('[하루한끼] 문의 ' + r.ticket + ' 답변')}>메일로 답장</a>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : !error && !loading ? (
+        <div className="empty">
+          {token ? '접수된 문의가 없습니다.' : '관리자 토큰을 넣고 불러오기를 누르세요.'}
+        </div>
+      ) : null}
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
