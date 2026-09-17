@@ -3,3 +3,7 @@ test-db.js
 test-server.js
 README.md
 .env
+
+# 로컬 개발 전용 — 이 파일이 배포에 있으면 Vercel 이 이걸 앱 진입점으로 잡아
+# 정적 index.html 대신 서버 하나로 말아버린다. Vercel 에서는 api/*.js 가 함수로 동작한다.
+server.js
