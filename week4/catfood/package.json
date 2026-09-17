@@ -1,0 +1,19 @@
+{
+  "name": "week4-catfood",
+  "version": "1.0.0",
+  "private": true,
+  "description": "week4 고양이 사료 상품페이지 + 문의 폼 (PostgreSQL)",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-db.js && node test-server.js",
+    "test:db": "node test-db.js",
+    "test:api": "node test-server.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "pg-mem": "^3.0.5"
+  }
+}
