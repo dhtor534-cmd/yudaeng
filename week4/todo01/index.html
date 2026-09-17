@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>todo01 — 텍스트 파일에 쌓이는 투두</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" />
+<style>
+  :root {
+    --bg: #0C0E12; --panel: #14171E; --panel-2: #191D26; --line: #262B36; --line-soft: #1E222B;
+    --ink: #EDF1F6; --dim: #98A1B0; --faint: #626B7A;
+    --brand: #3DD6A0; --brand-2: #57D9FF; --warn: #F2C14E; --danger: #FF6B6B;
+    --shadow: 0 22px 54px -30px rgba(0,0,0,.9);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: radial-gradient(900px 520px at 20% -10%, rgba(61,214,160,.10), transparent 60%), var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans KR", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+  .wrap { max-width: 720px; margin: 0 auto; padding: 42px 20px 80px; }
+
+  header.top { display: flex; align-items: center; gap: 12px; margin-bottom: 4px; }
+  header.top .mark {
+    width: 36px; height: 36px; border-radius: 11px; display: grid; place-items: center; font-size: 17px;
+    background: linear-gradient(135deg, var(--brand), #2AA97D); color: #06251A; font-weight: 700;
+  }
+  header.top h1 { margin: 0; font-size: 21px; letter-spacing: -.3px; }
+  .sub { color: var(--faint); font-size: 12.5px; margin: 0 0 22px 48px; }
+  .sub b { color: var(--dim); font-weight: 500; }
+
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+
+  form.add { display: flex; gap: 8px; padding: 12px; }
+  form.add input[type="text"] {
+    flex: 1; min-width: 0; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 11px; padding: 11px 13px; outline: none; font-size: 14.5px;
+  }
+  form.add input[type="text"]:focus { border-color: rgba(61,214,160,.55); box-shadow: 0 0 0 3px rgba(61,214,160,.12); }
+  form.add input::placeholder { color: var(--faint); }
+  form.add select {
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px; padding: 0 10px; outline: none; font-size: 13px; color: var(--dim);
+  }
+  form.add select option { background: #14171E; }
+  form.add button {
+    border: 0; border-radius: 11px; padding: 0 20px; font-weight: 600; font-size: 14px;
+    background: linear-gradient(135deg, var(--brand), #2FBF8C); color: #05251A; white-space: nowrap;
+  }
+  form.add button:disabled { opacity: .45; cursor: not-allowed; }
+
+  .bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line-soft); background: var(--panel-2); border-radius: 0 0 16px 16px; }
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .seg button { border: 0; background: transparent; color: var(--dim); padding: 5px 11px; font-size: 12.5px; }
+  .seg button[aria-pressed="true"] { background: var(--brand); color: #05251A; font-weight: 600; }
+  .seg button:hover:not([aria-pressed="true"]) { background: #222734; color: var(--ink); }
+  .bar .count { font-size: 12.5px; color: var(--faint); margin-left: auto; }
+  .ghost { border: 1px solid var(--line); background: transparent; color: var(--dim); border-radius: 9px; padding: 5px 10px; font-size: 12.5px; }
+  .ghost:hover { color: var(--ink); border-color: #38404F; background: var(--panel); }
+  .ghost:disabled { opacity: .4; cursor: not-allowed; }
+
+  ul.list { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  li.item {
+    display: flex; align-items: flex-start; gap: 11px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 13px; padding: 12px 13px;
+    transition: border-color .15s, opacity .2s;
+  }
+  li.item:hover { border-color: #323A49; }
+  li.item.done { opacity: .55; }
+  li.item .check {
+    width: 21px; height: 21px; flex: none; margin-top: 1px; border-radius: 7px;
+    border: 1.5px solid #39414F; background: transparent; display: grid; place-items: center;
+    font-size: 12px; color: #05251A; transition: .15s;
+  }
+  li.item.done .check { background: var(--brand); border-color: var(--brand); }
+  li.item .body { flex: 1; min-width: 0; }
+  li.item .text { font-size: 14.5px; word-break: break-word; cursor: text; }
+  li.item.done .text { text-decoration: line-through; text-decoration-color: rgba(255,255,255,.35); }
+  li.item .meta { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 5px; font-size: 11.5px; color: var(--faint); font-family: "IBM Plex Mono", monospace; }
+  li.item .meta .tag { border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; }
+  .tag.p높음 { color: #FFB4B4; border-color: rgba(255,107,107,.35); }
+  .tag.p보통 { color: var(--dim); }
+  .tag.p낮음 { color: var(--faint); }
+  li.item .edit {
+    width: 100%; background: var(--panel-2); border: 1px solid rgba(61,214,160,.5);
+    border-radius: 9px; padding: 7px 9px; outline: none; font-size: 14.5px;
+  }
+  li.item .x { border: 0; background: transparent; color: var(--faint); font-size: 15px; padding: 2px 4px; border-radius: 7px; flex: none; }
+  li.item .x:hover { color: var(--danger); background: rgba(255,107,107,.1); }
+
+  .empty { text-align: center; color: var(--faint); padding: 46px 20px; border: 1px dashed var(--line); border-radius: 14px; margin-top: 18px; }
+  .empty .big { font-size: 30px; margin-bottom: 8px; }
+
+  .banner { border-radius: 13px; padding: 12px 14px; font-size: 13px; line-height: 1.6; margin-bottom: 16px; }
+  .banner.err { background: rgba(255,107,107,.08); border: 1px solid rgba(255,107,107,.32); color: #FFC4C4; }
+  .banner code { font-family: "IBM Plex Mono", monospace; background: rgba(0,0,0,.3); padding: 1px 6px; border-radius: 5px; }
+
+  .filebox { margin-top: 22px; }
+  .filebox summary { cursor: pointer; font-size: 13px; color: var(--dim); list-style: none; display: flex; align-items: center; gap: 8px; }
+  .filebox summary::-webkit-details-marker { display: none; }
+  .filebox summary::before { content: "▸"; color: var(--faint); transition: transform .15s; }
+  .filebox[open] summary::before { transform: rotate(90deg); }
+  .filebox pre {
+    margin: 10px 0 0; background: #090B0F; border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; overflow-x: auto; font-family: "IBM Plex Mono", monospace; font-size: 12px;
+    color: #C6CFDC; line-height: 1.75; tab-size: 12; white-space: pre;
+  }
+  .toast {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 11px;
+    padding: 9px 16px; font-size: 13px; box-shadow: var(--shadow);
+  }
+  @media (max-width: 560px) {
+    .wrap { padding: 26px 14px 60px; }
+    form.add { flex-wrap: wrap; }
+    form.add button { flex: 1; padding: 10px 16px; }
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js"></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* 모든 변경은 서버를 거치고, 서버가 돌려준 목록을 그대로 화면에 쓴다.
+   = 화면과 txt 파일이 어긋날 일이 없다. */
+async function api(path, options) {
+  const res = await fetch('api/' + path, Object.assign({ cache: 'no-store' }, options, {
+    headers: options && options.body ? { 'Content-Type': 'application/json' } : undefined
+  }));
+  let data = null;
+  try { data = await res.json(); } catch (e) { data = null; }
+  if (!res.ok) throw new Error((data && data.detail) || ('서버 오류 ' + res.status));
+  return data;
+}
+
+function Item({ todo, onToggle, onEdit, onRemove, busy }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(todo.text);
+  const ref = useRef(null);
+  useEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.select(); } }, [editing]);
+
+  const commit = () => {
+    const v = draft.trim();
+    setEditing(false);
+    if (v && v !== todo.text) onEdit(todo, v); else setDraft(todo.text);
+  };
+  return (
+    <li className={'item' + (todo.done ? ' done' : '')}>
+      <button className="check" onClick={() => onToggle(todo)} disabled={busy}
+        aria-label={todo.done ? '완료 취소' : '완료로 표시'}>{todo.done ? '✔' : ''}</button>
+      <div className="body">
+        {editing ? (
+          <input ref={ref} className="edit" value={draft}
+            onChange={e => setDraft(e.target.value)}
+            onBlur={commit}
+            onKeyDown={e => {
+              if (e.key === 'Enter') { e.preventDefault(); commit(); }
+              if (e.key === 'Escape') { setDraft(todo.text); setEditing(false); }
+            }} />
+        ) : (
+          <div className="text" onDoubleClick={() => setEditing(true)} title="더블클릭하면 고칠 수 있습니다">{todo.text}</div>
+        )}
+        <div className="meta">
+          <span className={'tag p' + todo.priority}>{todo.priority}</span>
+          <span>{todo.created}</span>
+          {todo.done && todo.doneAt && <span>완료 {todo.doneAt}</span>}
+          <span style={{ opacity: .6 }}>#{todo.id}</span>
+        </div>
+      </div>
+      <button className="x" onClick={() => onRemove(todo)} disabled={busy} title="삭제">✕</button>
+    </li>
+  );
+}
+
+function App() {
+  const [todos, setTodos] = useState([]);
+  const [raw, setRaw] = useState('');
+  const [info, setInfo] = useState({ fileName: 'data/todos.txt', priorities: ['높음', '보통', '낮음'] });
+  const [text, setText] = useState('');
+  const [priority, setPriority] = useState('보통');
+  const [filter, setFilter] = useState('all');
+  const [error, setError] = useState(null);
+  const [ready, setReady] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const say = useCallback(msg => {
+    setToast(msg);
+    setTimeout(() => setToast(t => (t === msg ? null : t)), 2000);
+  }, []);
+
+  const apply = data => {
+    setTodos(data.todos || []);
+    setRaw(data.raw || '');
+    if (data.fileName) setInfo({ fileName: data.fileName, priorities: data.priorities || info.priorities });
+    setError(null);
+  };
+  const run = async (fn, okMsg) => {
+    setBusy(true);
+    try { apply(await fn()); if (okMsg) say(okMsg); }
+    catch (e) { setError(e.message); }
+    setBusy(false);
+  };
+
+  const reload = useCallback(async () => {
+    try { apply(await api('todos')); }
+    catch (e) { setError(e.message); }
+    setReady(true);
+  }, []);
+  useEffect(() => { reload(); }, [reload]);
+
+  const add = e => {
+    e.preventDefault();
+    const v = text.trim();
+    if (!v || busy) return;
+    setText('');
+    run(() => api('todos', { method: 'POST', body: JSON.stringify({ text: v, priority }) }), '파일에 저장했습니다');
+  };
+  const toggle = t => run(() => api('todos/' + t.id, { method: 'PATCH', body: JSON.stringify({ done: !t.done }) }));
+  const edit = (t, v) => run(() => api('todos/' + t.id, { method: 'PATCH', body: JSON.stringify({ text: v }) }), '수정했습니다');
+  const remove = t => run(() => api('todos/' + t.id, { method: 'DELETE' }), '지웠습니다');
+  const clearDone = () => run(() => api('todos/clear-done', { method: 'POST' }), '완료된 항목을 지웠습니다');
+
+  const left = todos.filter(t => !t.done).length;
+  const doneCount = todos.length - left;
+  const shown = useMemo(() => (
+    filter === 'todo' ? todos.filter(t => !t.done)
+      : filter === 'done' ? todos.filter(t => t.done)
+        : todos
+  ), [todos, filter]);
+
+  const offline = !!error && !todos.length;
+
+  return (
+    <div className="wrap">
+      <header className="top">
+        <div className="mark">✓</div>
+        <h1>todo01</h1>
+      </header>
+      <p className="sub">
+        적은 내용은 그대로 <b className="mono">{info.fileName}</b> 에 저장됩니다 — 메모장으로 열어봐도 되고, 고쳐도 됩니다.
+      </p>
+
+      {error && (
+        <div className="banner err">
+          ⚠ {error}
+          {offline && (
+            <>
+              <br />이 폴더에서 <code>node server.js</code> 를 실행하고 <code>http://localhost:8788</code> 로 접속하세요.
+              파일을 그냥 더블클릭해서 열면 저장할 서버가 없습니다.
+            </>
+          )}
+          <br /><button className="ghost" style={{ marginTop: 8 }} onClick={reload}>다시 시도</button>
+        </div>
+      )}
+
+      <div className="card">
+        <form className="add" onSubmit={add}>
+          <input type="text" value={text} onChange={e => setText(e.target.value)} maxLength={500}
+            placeholder="할 일을 적고 엔터 — 예: 목요일까지 과제 제출" />
+          <select value={priority} onChange={e => setPriority(e.target.value)} aria-label="우선순위">
+            {info.priorities.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <button type="submit" disabled={!text.trim() || busy}>추가</button>
+        </form>
+        <div className="bar">
+          <div className="seg">
+            <button aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>전체 {todos.length}</button>
+            <button aria-pressed={filter === 'todo'} onClick={() => setFilter('todo')}>할 일 {left}</button>
+            <button aria-pressed={filter === 'done'} onClick={() => setFilter('done')}>완료 {doneCount}</button>
+          </div>
+          <button className="ghost" onClick={clearDone} disabled={!doneCount || busy}>완료 지우기</button>
+          <span className="count">{ready ? (left ? '남은 일 ' + left + '개' : todos.length ? '다 끝냈습니다 🎉' : '') : '불러오는 중…'}</span>
+        </div>
+      </div>
+
+      {shown.length ? (
+        <ul className="list">
+          {shown.map(t => (
+            <Item key={t.id} todo={t} busy={busy} onToggle={toggle} onEdit={edit} onRemove={remove} />
+          ))}
+        </ul>
+      ) : ready && !error ? (
+        <div className="empty">
+          <div className="big">{filter === 'done' ? '🗂' : '📝'}</div>
+          {filter === 'done' ? '완료한 일이 아직 없습니다.'
+            : filter === 'todo' ? '할 일이 남아 있지 않습니다.'
+              : '첫 할 일을 적어보세요. 적는 순간 텍스트 파일에 기록됩니다.'}
+        </div>
+      ) : null}
+
+      <details className="filebox">
+        <summary>저장된 txt 파일 그대로 보기 ({info.fileName})</summary>
+        <pre>{raw || '(아직 비어 있습니다)'}</pre>
+      </details>
+
+      {toast && <div className="toast">{toast}</div>}
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
