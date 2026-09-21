@@ -61,6 +61,26 @@ const SCHEMA = [
   // AI 생성 레시피가 생기면서 나중에 붙인 칸들 — 이미 만들어진 DB 에도 안전하게 들어간다
   `ALTER TABLE fridge_recipes ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'seed'`,
   `ALTER TABLE fridge_recipes ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`,
+
+  // 로그인이 붙으면서 추가된 것들
+  `CREATE TABLE IF NOT EXISTS fridge_users (
+     id            bigserial   PRIMARY KEY,
+     email         text        NOT NULL UNIQUE,
+     name          text        NOT NULL DEFAULT '',
+     password_hash text        NOT NULL,
+     created_at    timestamptz NOT NULL DEFAULT now()
+   )`,
+
+  // 냉장고·장보기·요리기록·AI 레시피는 각자의 것이다.
+  // 기본 제공 레시피만 user_id 가 NULL 이고 모두가 함께 본다.
+  `ALTER TABLE fridge_ingredients ADD COLUMN IF NOT EXISTS user_id bigint`,
+  `ALTER TABLE fridge_shopping    ADD COLUMN IF NOT EXISTS user_id bigint`,
+  `ALTER TABLE fridge_cook_log    ADD COLUMN IF NOT EXISTS user_id bigint`,
+  `ALTER TABLE fridge_recipes     ADD COLUMN IF NOT EXISTS user_id bigint`,
+
+  `CREATE INDEX IF NOT EXISTS fridge_ing_user_idx  ON fridge_ingredients (user_id)`,
+  `CREATE INDEX IF NOT EXISTS fridge_shop_user_idx ON fridge_shopping (user_id)`,
+  `CREATE INDEX IF NOT EXISTS fridge_cook_user_idx ON fridge_cook_log (user_id)`,
 ];
 
 const ING_COLS = `id, name, emoji, category, qty, unit, storage, expires_at`;
@@ -121,6 +141,9 @@ const toShop = (r) => ({
   done: r.done === true || r.done === "t",
   emoji: metaOf(r.name).emoji,
 });
+
+/** 사용자 — 비밀번호 해시는 절대 포함하지 않는다 */
+const toUser = (r) => ({ id: String(r.id), email: r.email, name: r.name });
 
 const toCook = (r) => ({
   id: String(r.id),
@@ -415,7 +438,7 @@ function makeStore(query, tx) {
       await store.seed();
     },
 
-    /** 처음 켰을 때만 채운다. 레시피는 새로 추가된 것만 들어가고 기존 행은 건드리지 않는다. */
+    /** 기본 제공 레시피는 모두가 함께 본다 (user_id NULL). 새로 추가된 것만 들어간다. */
     async seed() {
       for (const r of SEED_RECIPES) {
         await query(
@@ -426,13 +449,20 @@ function makeStore(query, tx) {
            JSON.stringify(r.tags), JSON.stringify(r.need), JSON.stringify(r.steps)]
         );
       }
-      const [{ n }] = await query(`SELECT count(*)::int AS n FROM fridge_ingredients`);
+      return { seeded: true, recipes: SEED_RECIPES.length };
+    },
+
+    /** 새로 가입한 사람에게 시작용 냉장고를 채워 준다. 이미 뭔가 있으면 건드리지 않는다. */
+    async seedFridge(userId) {
+      const [{ n }] = await query(
+        `SELECT count(*)::int AS n FROM fridge_ingredients WHERE user_id = $1`, [userId]
+      );
       if (Number(n) > 0) return { seeded: false };
       for (const s of SEED_INGREDIENTS) {
         await query(
-          `INSERT INTO fridge_ingredients (name, emoji, category, qty, unit, storage, expires_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [s.name, s.emoji, s.category, s.qty, s.unit, s.storage, dateStr(s.days)]
+          `INSERT INTO fridge_ingredients (user_id, name, emoji, category, qty, unit, storage, expires_at)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [userId, s.name, s.emoji, s.category, s.qty, s.unit, s.storage, dateStr(s.days)]
         );
       }
       return { seeded: true, count: SEED_INGREDIENTS.length };
@@ -440,16 +470,22 @@ function makeStore(query, tx) {
 
     /* ---------- 읽기 ---------- */
 
-    async ingredients() {
+    async ingredients(userId) {
       const rows = await query(
         `SELECT ${ING_COLS} FROM fridge_ingredients
-         ORDER BY expires_at NULLS LAST, name`
+          WHERE user_id = $1
+          ORDER BY expires_at NULLS LAST, name`,
+        [userId]
       );
       return rows.map(toIngredient);
     },
 
-    async recipes() {
-      const rows = await query(`SELECT * FROM fridge_recipes ORDER BY id`);
+    /** 기본 제공 레시피(공용) + 내가 AI 로 만든 것 */
+    async recipes(userId) {
+      const rows = await query(
+        `SELECT * FROM fridge_recipes WHERE user_id IS NULL OR user_id = $1 ORDER BY id`,
+        [userId]
+      );
       // AI 가 만든 건 방금 만든 게 위로, 기본 레시피는 r1, r2 … r10 순서로.
       // (id 가 문자열이라 그냥 정렬하면 r10 이 r2 앞에 온다)
       const seq = (id) => parseInt(String(id).replace(/\D/g, ""), 10) || 0;
@@ -459,44 +495,48 @@ function makeStore(query, tx) {
       });
     },
 
-    async shopping() {
-      const rows = await query(`SELECT ${SHOP_COLS} FROM fridge_shopping ORDER BY done, id`);
+    async shopping(userId) {
+      const rows = await query(
+        `SELECT ${SHOP_COLS} FROM fridge_shopping WHERE user_id = $1 ORDER BY done, id`, [userId]
+      );
       return rows.map(toShop);
     },
 
-    async cooks(limit = 5) {
+    async cooks(userId, limit = 5) {
       const rows = await query(
         `SELECT id, recipe_id, recipe_name, used, cooked_at
-           FROM fridge_cook_log ORDER BY cooked_at DESC, id DESC LIMIT $1`,
-        [limit]
+           FROM fridge_cook_log WHERE user_id = $1
+           ORDER BY cooked_at DESC, id DESC LIMIT $2`,
+        [userId, limit]
       );
       return rows.map(toCook);
     },
 
-    /** 화면이 한 번에 받아 가는 전체 상태 */
-    async state() {
+    /** 화면이 한 번에 받아 가는 전체 상태 (그 사람 것만) */
+    async state(userId) {
       return {
-        ingredients: await store.ingredients(),
-        recipes: await store.recipes(),
-        shopping: await store.shopping(),
-        cooks: await store.cooks(),
+        ingredients: await store.ingredients(userId),
+        recipes: await store.recipes(userId),
+        shopping: await store.shopping(userId),
+        cooks: await store.cooks(userId),
       };
     },
 
     /* ---------- 재료 ---------- */
 
-    async addIngredient(input) {
+    async addIngredient(userId, input) {
       const v = cleanIngredient(input);
       const rows = await query(
-        `INSERT INTO fridge_ingredients (name, emoji, category, qty, unit, storage, expires_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING ${ING_COLS}`,
-        [v.name, v.emoji, v.category, v.qty, v.unit, v.storage, v.expiresAt]
+        `INSERT INTO fridge_ingredients (user_id, name, emoji, category, qty, unit, storage, expires_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING ${ING_COLS}`,
+        [userId, v.name, v.emoji, v.category, v.qty, v.unit, v.storage, v.expiresAt]
       );
       return toIngredient(rows[0]);
     },
 
-    /** 바꿀 칸만 골라 SET 절을 만든다. 칸 이름은 코드에 적힌 것만 쓰이고 값은 전부 파라미터. */
-    async updateIngredient(id, patch) {
+    /** 바꿀 칸만 골라 SET 절을 만든다. 칸 이름은 코드에 적힌 것만 쓰이고 값은 전부 파라미터.
+        WHERE 에 user_id 가 반드시 들어간다 — 남의 재료는 건드릴 수 없다. */
+    async updateIngredient(userId, id, patch) {
       const sets = [];
       const args = [];
       const put = (col, val) => { args.push(val); sets.push(`${col} = $${args.length}`); };
@@ -514,9 +554,10 @@ function makeStore(query, tx) {
       if (patch.expiresAt !== undefined) put("expires_at", cleanDate(patch.expiresAt));
       if (!sets.length) throw bad("바꿀 내용이 없습니다.");
 
-      args.push(id);
+      args.push(id, userId);
       const rows = await query(
-        `UPDATE fridge_ingredients SET ${sets.join(", ")} WHERE id = $${args.length} RETURNING ${ING_COLS}`,
+        `UPDATE fridge_ingredients SET ${sets.join(", ")}
+          WHERE id = $${args.length - 1} AND user_id = $${args.length} RETURNING ${ING_COLS}`,
         args
       );
       if (!rows.length) throw Object.assign(new Error("그런 재료가 없습니다."), { status: 404 });
@@ -524,21 +565,23 @@ function makeStore(query, tx) {
     },
 
     /** +/- 버튼. 0 밑으로는 안 내려가고, DB 에서 바로 더한다(경쟁 조건 없음). */
-    async bumpIngredient(id, delta) {
+    async bumpIngredient(userId, id, delta) {
       const d = Number(delta);
       if (!isFinite(d) || d === 0) throw bad("변화량이 올바르지 않습니다.");
       const rows = await query(
         `UPDATE fridge_ingredients
             SET qty = CASE WHEN qty + $1 < 0 THEN 0 ELSE qty + $1 END
-          WHERE id = $2 RETURNING ${ING_COLS}`,
-        [Math.round(d * 100) / 100, id]
+          WHERE id = $2 AND user_id = $3 RETURNING ${ING_COLS}`,
+        [Math.round(d * 100) / 100, id, userId]
       );
       if (!rows.length) throw Object.assign(new Error("그런 재료가 없습니다."), { status: 404 });
       return toIngredient(rows[0]);
     },
 
-    async removeIngredient(id) {
-      const rows = await query(`DELETE FROM fridge_ingredients WHERE id = $1 RETURNING name`, [id]);
+    async removeIngredient(userId, id) {
+      const rows = await query(
+        `DELETE FROM fridge_ingredients WHERE id = $1 AND user_id = $2 RETURNING name`, [id, userId]
+      );
       if (!rows.length) throw Object.assign(new Error("그런 재료가 없습니다."), { status: 404 });
       return rows[0].name;
     },
@@ -546,25 +589,28 @@ function makeStore(query, tx) {
     /* ---------- 레시피 (AI 가 만든 것) ---------- */
 
     /** AI 응답은 ai.js 에서 이미 검증·정리된 뒤 여기로 온다. */
-    async addRecipe(recipe) {
+    async addRecipe(userId, recipe) {
       const id = "ai-" + Date.now();
       const rows = await query(
-        `INSERT INTO fridge_recipes (id, name, emoji, descr, minutes, level, servings, tags, need, steps, source)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'ai') RETURNING *`,
-        [id, recipe.name, recipe.emoji, recipe.desc, recipe.minutes, recipe.level, recipe.servings,
+        `INSERT INTO fridge_recipes (id, user_id, name, emoji, descr, minutes, level, servings, tags, need, steps, source)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'ai') RETURNING *`,
+        [id, userId, recipe.name, recipe.emoji, recipe.desc, recipe.minutes, recipe.level, recipe.servings,
          JSON.stringify(recipe.tags), JSON.stringify(recipe.need), JSON.stringify(recipe.steps)]
       );
       return toRecipe(rows[0]);
     },
 
-    /** 기본 제공 레시피는 못 지운다 — AI 가 만든 것만. */
-    async removeRecipe(id) {
-      const found = await query(`SELECT source, name FROM fridge_recipes WHERE id = $1`, [id]);
+    /** 기본 제공 레시피는 못 지운다 — 내가 AI 로 만든 것만. */
+    async removeRecipe(userId, id) {
+      const found = await query(
+        `SELECT source, name, user_id FROM fridge_recipes
+          WHERE id = $1 AND (user_id IS NULL OR user_id = $2)`, [id, userId]
+      );
       if (!found.length) throw Object.assign(new Error("그런 레시피가 없습니다."), { status: 404 });
       if ((found[0].source || "seed") !== "ai") {
         throw Object.assign(new Error("기본 제공 레시피는 지울 수 없습니다."), { status: 403 });
       }
-      await query(`DELETE FROM fridge_recipes WHERE id = $1`, [id]);
+      await query(`DELETE FROM fridge_recipes WHERE id = $1 AND user_id = $2`, [id, userId]);
       return found[0].name;
     },
 
@@ -572,13 +618,18 @@ function makeStore(query, tx) {
        여러 재료를 한꺼번에 깎으므로 트랜잭션으로 묶는다.
        중간에 실패하면 하나도 안 깎인 상태로 되돌아간다. */
 
-    async cook(recipeId) {
+    async cook(userId, recipeId) {
       return runTx(async (q) => {
-        const found = await q(`SELECT * FROM fridge_recipes WHERE id = $1`, [recipeId]);
+        const found = await q(
+          `SELECT * FROM fridge_recipes WHERE id = $1 AND (user_id IS NULL OR user_id = $2)`,
+          [recipeId, userId]
+        );
         if (!found.length) throw Object.assign(new Error("그런 레시피가 없습니다."), { status: 404 });
         const recipe = toRecipe(found[0]);
 
-        const have = (await q(`SELECT ${ING_COLS} FROM fridge_ingredients`)).map(toIngredient);
+        const have = (await q(
+          `SELECT ${ING_COLS} FROM fridge_ingredients WHERE user_id = $1`, [userId]
+        )).map(toIngredient);
         const byName = new Map(have.map((i) => [i.name, i]));
 
         // 필수 재료가 하나라도 모자라면 아무것도 건드리지 않고 되돌린다
@@ -602,16 +653,17 @@ function makeStore(query, tx) {
           await q(
             `UPDATE fridge_ingredients
                 SET qty = CASE WHEN qty - $1 < 0 THEN 0 ELSE qty - $1 END
-              WHERE id = $2`,
-            [n.qty, h.id]
+              WHERE id = $2 AND user_id = $3`,
+            [n.qty, h.id, userId]
           );
           used.push({ name: n.name, qty: n.qty, unit: n.unit });
         }
-        await q(`DELETE FROM fridge_ingredients WHERE qty <= 0`);   // 다 쓴 재료는 냉장고에서 뺀다
+        // 다 쓴 재료는 냉장고에서 뺀다 (내 것만)
+        await q(`DELETE FROM fridge_ingredients WHERE qty <= 0 AND user_id = $1`, [userId]);
 
         await q(
-          `INSERT INTO fridge_cook_log (recipe_id, recipe_name, used) VALUES ($1,$2,$3)`,
-          [recipe.id, recipe.name, JSON.stringify(used)]
+          `INSERT INTO fridge_cook_log (user_id, recipe_id, recipe_name, used) VALUES ($1,$2,$3,$4)`,
+          [userId, recipe.id, recipe.name, JSON.stringify(used)]
         );
         return { recipe: recipe.name, used };
       });
@@ -619,7 +671,7 @@ function makeStore(query, tx) {
 
     /* ---------- 장보기 ---------- */
 
-    async addShopping(items) {
+    async addShopping(userId, items) {
       const list = (Array.isArray(items) ? items : [items])
         .map((it) => ({
           name: clean(it.name),
@@ -630,13 +682,15 @@ function makeStore(query, tx) {
         .filter((it) => it.name);
       if (!list.length) throw bad("담을 항목이 없습니다.");
 
-      const existing = new Set((await query(`SELECT name FROM fridge_shopping`)).map((r) => r.name));
+      const existing = new Set(
+        (await query(`SELECT name FROM fridge_shopping WHERE user_id = $1`, [userId])).map((r) => r.name)
+      );
       let added = 0;
       for (const it of list) {
         if (existing.has(it.name)) continue;          // 같은 이름은 한 번만
         await query(
-          `INSERT INTO fridge_shopping (name, qty, unit, source) VALUES ($1,$2,$3,$4)`,
-          [it.name, it.qty, it.unit, it.source]
+          `INSERT INTO fridge_shopping (user_id, name, qty, unit, source) VALUES ($1,$2,$3,$4,$5)`,
+          [userId, it.name, it.qty, it.unit, it.source]
         );
         existing.add(it.name);
         added++;
@@ -644,34 +698,42 @@ function makeStore(query, tx) {
       return added;
     },
 
-    async toggleShopping(id) {
+    async toggleShopping(userId, id) {
       const rows = await query(
-        `UPDATE fridge_shopping SET done = NOT done WHERE id = $1 RETURNING ${SHOP_COLS}`, [id]
+        `UPDATE fridge_shopping SET done = NOT done
+          WHERE id = $1 AND user_id = $2 RETURNING ${SHOP_COLS}`, [id, userId]
       );
       if (!rows.length) throw Object.assign(new Error("그런 항목이 없습니다."), { status: 404 });
       return toShop(rows[0]);
     },
 
-    async removeShopping(id) {
-      const rows = await query(`DELETE FROM fridge_shopping WHERE id = $1 RETURNING id`, [id]);
+    async removeShopping(userId, id) {
+      const rows = await query(
+        `DELETE FROM fridge_shopping WHERE id = $1 AND user_id = $2 RETURNING id`, [id, userId]
+      );
       if (!rows.length) throw Object.assign(new Error("그런 항목이 없습니다."), { status: 404 });
       return true;
     },
 
-    async clearDoneShopping() {
-      const rows = await query(`DELETE FROM fridge_shopping WHERE done = true RETURNING id`);
+    async clearDoneShopping(userId) {
+      const rows = await query(
+        `DELETE FROM fridge_shopping WHERE done = true AND user_id = $1 RETURNING id`, [userId]
+      );
       return rows.length;
     },
 
     /** 체크한 장바구니 항목을 냉장고로 옮긴다 — 담기와 지우기를 한 트랜잭션으로. */
-    async stockUp() {
+    async stockUp(userId) {
       return runTx(async (q) => {
-        const bought = (await q(`SELECT ${SHOP_COLS} FROM fridge_shopping WHERE done = true`)).map(toShop);
+        const bought = (await q(
+          `SELECT ${SHOP_COLS} FROM fridge_shopping WHERE done = true AND user_id = $1`, [userId]
+        )).map(toShop);
         if (!bought.length) throw bad("체크한 항목이 없습니다.");
 
         for (const b of bought) {
           const same = await q(
-            `SELECT id FROM fridge_ingredients WHERE name = $1 AND unit = $2 LIMIT 1`, [b.name, b.unit]
+            `SELECT id FROM fridge_ingredients WHERE name = $1 AND unit = $2 AND user_id = $3 LIMIT 1`,
+            [b.name, b.unit, userId]
           );
           if (same.length) {
             await q(
@@ -681,33 +743,65 @@ function makeStore(query, tx) {
           } else {
             const meta = metaOf(b.name);
             await q(
-              `INSERT INTO fridge_ingredients (name, emoji, category, qty, unit, storage, expires_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-              [b.name, meta.emoji, meta.category, b.qty, b.unit, "냉장", dateStr(7)]
+              `INSERT INTO fridge_ingredients (user_id, name, emoji, category, qty, unit, storage, expires_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+              [userId, b.name, meta.emoji, meta.category, b.qty, b.unit, "냉장", dateStr(7)]
             );
           }
         }
-        await q(`DELETE FROM fridge_shopping WHERE done = true`);
+        await q(`DELETE FROM fridge_shopping WHERE done = true AND user_id = $1`, [userId]);
         return bought.length;
       });
     },
 
     /* ---------- 초기화 ---------- */
 
-    async reset() {
+    /** 내 냉장고·장보기·요리기록만 지우고 시드로 되돌린다. 남의 것과 기본 레시피는 그대로. */
+    async reset(userId) {
       return runTx(async (q) => {
-        await q(`DELETE FROM fridge_ingredients`);
-        await q(`DELETE FROM fridge_shopping`);
-        await q(`DELETE FROM fridge_cook_log`);
+        await q(`DELETE FROM fridge_ingredients WHERE user_id = $1`, [userId]);
+        await q(`DELETE FROM fridge_shopping WHERE user_id = $1`, [userId]);
+        await q(`DELETE FROM fridge_cook_log WHERE user_id = $1`, [userId]);
         for (const s of SEED_INGREDIENTS) {
           await q(
-            `INSERT INTO fridge_ingredients (name, emoji, category, qty, unit, storage, expires_at)
-             VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-            [s.name, s.emoji, s.category, s.qty, s.unit, s.storage, dateStr(s.days)]
+            `INSERT INTO fridge_ingredients (user_id, name, emoji, category, qty, unit, storage, expires_at)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+            [userId, s.name, s.emoji, s.category, s.qty, s.unit, s.storage, dateStr(s.days)]
           );
         }
         return SEED_INGREDIENTS.length;
       });
+    },
+
+    /* ---------- 사용자 ---------- */
+
+    async createUser(email, name, passwordHash) {
+      const dup = await query(`SELECT id FROM fridge_users WHERE email = $1`, [email]);
+      if (dup.length) throw Object.assign(new Error("이미 가입된 이메일입니다."), { status: 409 });
+      const rows = await query(
+        `INSERT INTO fridge_users (email, name, password_hash)
+         VALUES ($1,$2,$3) RETURNING id, email, name`,
+        [email, name, passwordHash]
+      );
+      return toUser(rows[0]);
+    },
+
+    /** 로그인 확인용 — 비밀번호 해시까지 같이 준다 (응답으로 내보내면 안 된다) */
+    async findUserByEmail(email) {
+      const rows = await query(
+        `SELECT id, email, name, password_hash FROM fridge_users WHERE email = $1`, [email]
+      );
+      return rows.length ? rows[0] : null;
+    },
+
+    async findUserById(id) {
+      const rows = await query(`SELECT id, email, name FROM fridge_users WHERE id = $1`, [id]);
+      return rows.length ? toUser(rows[0]) : null;
+    },
+
+    async countUsers() {
+      const [{ n }] = await query(`SELECT count(*)::int AS n FROM fridge_users`);
+      return Number(n) || 0;
     },
   };
 
@@ -718,5 +812,5 @@ module.exports = {
   CATEGORIES, STORAGES, UNITS,
   SCHEMA, SEED_INGREDIENTS, SEED_RECIPES, KNOWN,
   makeStore, metaOf, dateStr, clean, cleanQty, cleanDate, cleanIngredient,
-  toIngredient, toRecipe, toShop, toCook,
+  toIngredient, toRecipe, toShop, toCook, toUser,
 };

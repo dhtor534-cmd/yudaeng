@@ -3,9 +3,14 @@
 // 로컬(server.js) 과 Vercel 서버리스 함수(api/index.js) 가 이 파일을 같이 쓴다.
 // 순수 Node 의 req/res 만 쓰므로 양쪽에서 똑같이 동작한다.
 //
-// 의존성은 pg 하나. 접속 정보는 환경변수에만 있고 브라우저로 내려가지 않는다.
+// 의존성은 pg 하나. 접속 정보와 JWT 서명 키는 환경변수에만 있고 브라우저로 내려가지 않는다.
+// /api/auth/* 를 뺀 모든 엔드포인트는 Authorization: Bearer <토큰> 이 필요하고,
+// 냉장고·장보기·요리기록은 전부 로그인한 사람 것만 보이고 바뀐다.
 //
 // 엔드포인트 (쓰기 요청은 전부 바뀐 뒤의 전체 상태를 그대로 돌려준다 → 화면은 받아서 갈아끼우기만)
+//   POST   /api/auth/signup             { email, password, name? } → { token, user }
+//   POST   /api/auth/login              { email, password }        → { token, user }
+//   GET    /api/auth/me                 토큰 확인 → { user }
 //   GET    /api/health                  DB 연결 상태 (비밀번호는 빼고 호스트/DB 이름만)
 //   GET    /api/state                   { ingredients, recipes, shopping, cooks }
 //   POST   /api/ingredients             { name, emoji, category, qty, unit, storage, expiresAt }
@@ -27,6 +32,7 @@ const path = require("node:path");
 const { Pool } = require("pg");
 const { CATEGORIES, STORAGES, UNITS, makeStore } = require("./db");
 const { generateRecipe } = require("./ai");
+const auth = require("./auth");
 
 const ROOT = __dirname;
 
@@ -186,14 +192,66 @@ async function json(req) {
 const AI_ON = !!(process.env.OPENAI_API_KEY || "").trim();
 let aiBusy = false;
 
+/* =========================================================
+   로그인 — 토큰 발급과 검사
+   ========================================================= */
+
+const { secret: JWT_SECRET, temporary: JWT_TEMP } = auth.getSecret();
+
+const publicUser = (u) => ({ id: String(u.id), email: u.email, name: u.name });
+
+/** 토큰에는 사용자 id 만 담는다. JWT payload 는 누구나 읽을 수 있기 때문. */
+const issue = (user) => auth.sign({ sub: String(user.id) }, JWT_SECRET);
+
+/**
+ * Authorization 헤더의 토큰을 확인하고 실제 사용자를 돌려준다.
+ * 토큰이 멀쩡해도 그 사이 계정이 사라졌을 수 있어 DB 를 한 번 더 본다
+ * (데모 모드에서 서버가 새로 뜨면 실제로 이런 일이 생긴다).
+ */
+async function requireAuth(req) {
+  const token = auth.bearer(req);
+  if (!token) throw Object.assign(new Error("로그인이 필요합니다."), { status: 401 });
+  const claims = auth.verify(token, JWT_SECRET);
+  if (!claims) throw Object.assign(new Error("로그인이 만료되었습니다. 다시 로그인해 주세요."), { status: 401 });
+  const user = await store.findUserById(claims.sub);
+  if (!user) throw Object.assign(new Error("계정을 찾을 수 없습니다. 다시 로그인해 주세요."), { status: 401 });
+  return user;
+}
+
+async function signup(req, res) {
+  const body = await json(req);
+  const email = auth.cleanEmail(body.email);
+  const password = auth.checkPassword(body.password);
+  const name = auth.cleanName(body.name, email);
+
+  const user = await store.createUser(email, name, await auth.hashPassword(password));
+  await store.seedFridge(user.id);            // 시작용 냉장고를 채워 준다
+  console.log(`  [가입] ${email}`);
+  return sendJson(res, 201, { token: issue(user), user: publicUser(user) });
+}
+
+async function login(req, res) {
+  const body = await json(req);
+  const email = auth.cleanEmail(body.email);
+  const row = await store.findUserByEmail(email);
+
+  // 이메일이 없는 경우와 비밀번호가 틀린 경우를 구분해서 알려주지 않는다
+  // (어떤 이메일이 가입돼 있는지 알아내는 데 쓰일 수 있어서)
+  const ok = row && (await auth.verifyPassword(String(body.password || ""), row.password_hash));
+  if (!ok) throw Object.assign(new Error("이메일 또는 비밀번호가 맞지 않습니다."), { status: 401 });
+
+  return sendJson(res, 200, { token: issue(row), user: publicUser(row) });
+}
+
 /** 화면이 받아 가는 전체 상태 + 폼에 쓸 선택지 */
-const payload = async (extra) => Object.assign(
+const payload = async (userId, extra) => Object.assign(
   {
-    ...(await store.state()),
+    ...(await store.state(userId)),
     options: { categories: CATEGORIES, storages: STORAGES, units: UNITS },
     db: info ? { host: info.host, database: info.database } : null,
     ai: { enabled: AI_ON, model: (process.env.OPENAI_MODEL || "gpt-4o-mini").trim() },
     demo: DEMO,
+    user: await store.findUserById(userId),
   },
   extra || {}
 );
@@ -240,47 +298,58 @@ async function handle(req, res) {
         db: info ? { host: info.host, database: info.database, ssl: !!sslOption() } : null,
         ai: { enabled: AI_ON, model: (process.env.OPENAI_MODEL || "gpt-4o-mini").trim() },
         demo: DEMO,
+        auth: { jwtSecret: JWT_TEMP ? "임시(재시작하면 로그인 풀림)" : "환경변수" },
       });
     }
 
     if (p.startsWith("/api/")) {
       await ensureReady();
 
-      if (p === "/api/state" && m === "GET") return sendJson(res, 200, await payload());
+      /* ----- 로그인·회원가입 (토큰 없이 부를 수 있는 유일한 곳) ----- */
+      if (p === "/api/auth/signup" && m === "POST") return signup(req, res);
+      if (p === "/api/auth/login" && m === "POST") return login(req, res);
+
+      // 여기서부터는 전부 로그인이 필요하다
+      const me = await requireAuth(req);
+      const uid = me.id;
+
+      if (p === "/api/auth/me" && m === "GET") return sendJson(res, 200, { user: me });
+
+      if (p === "/api/state" && m === "GET") return sendJson(res, 200, await payload(uid));
 
       /* ----- 재료 ----- */
       if (p === "/api/ingredients" && m === "POST") {
-        const created = await store.addIngredient(await json(req));
-        return sendJson(res, 201, await payload({ message: `${created.name} 추가했어요` }));
+        const created = await store.addIngredient(uid, await json(req));
+        return sendJson(res, 201, await payload(uid, { message: `${created.name} 추가했어요` }));
       }
       let r = match(p, `/api/ingredients/${ID}`);
       if (r) {
         if (m === "PATCH") {
-          const updated = await store.updateIngredient(r[1], await json(req));
-          return sendJson(res, 200, await payload({ message: `${updated.name} 수정했어요` }));
+          const updated = await store.updateIngredient(uid, r[1], await json(req));
+          return sendJson(res, 200, await payload(uid, { message: `${updated.name} 수정했어요` }));
         }
         if (m === "DELETE") {
-          const name = await store.removeIngredient(r[1]);
-          return sendJson(res, 200, await payload({ message: `${name} 삭제했어요` }));
+          const name = await store.removeIngredient(uid, r[1]);
+          return sendJson(res, 200, await payload(uid, { message: `${name} 삭제했어요` }));
         }
       }
       r = match(p, `/api/ingredients/${ID}/bump`);
       if (r && m === "POST") {
         const body = await json(req);
-        await store.bumpIngredient(r[1], body.delta);
-        return sendJson(res, 200, await payload());
+        await store.bumpIngredient(uid, r[1], body.delta);
+        return sendJson(res, 200, await payload(uid));
       }
 
       /* ----- 요리 ----- */
       r = match(p, `/api/recipes/${RID}/cook`);
       if (r && m === "POST") {
-        const out = await store.cook(r[1]);
-        return sendJson(res, 200, await payload({ message: `🍽 ${out.recipe} 완성! 사용한 재료를 차감했어요` }));
+        const out = await store.cook(uid, r[1]);
+        return sendJson(res, 200, await payload(uid, { message: `🍽 ${out.recipe} 완성! 사용한 재료를 차감했어요` }));
       }
       r = match(p, `/api/recipes/${RID}`);
       if (r && m === "DELETE") {
-        const name = await store.removeRecipe(r[1]);
-        return sendJson(res, 200, await payload({ message: `${name} 레시피를 지웠어요` }));
+        const name = await store.removeRecipe(uid, r[1]);
+        return sendJson(res, 200, await payload(uid, { message: `${name} 레시피를 지웠어요` }));
       }
 
       /* ----- AI 레시피 생성 ----- */
@@ -294,12 +363,12 @@ async function handle(req, res) {
         aiBusy = true;
         try {
           const body = await json(req);
-          const ingredients = await store.ingredients();
+          const ingredients = await store.ingredients(uid);
           const out = await generateRecipe(ingredients, { note: body.note, use: body.use });
-          const saved = await store.addRecipe(out.recipe);
+          const saved = await store.addRecipe(uid, out.recipe);
           const tok = out.usage ? ` · 토큰 ${out.usage.total_tokens}` : "";
           console.log(`  [AI] ${saved.name} (${out.model}${tok})`);
-          return sendJson(res, 201, await payload({
+          return sendJson(res, 201, await payload(uid, {
             message: `✨ ${saved.name} 레시피를 만들었어요`,
             createdRecipeId: saved.id,
           }));
@@ -311,32 +380,32 @@ async function handle(req, res) {
       /* ----- 장보기 ----- */
       if (p === "/api/shopping" && m === "POST") {
         const body = await json(req);
-        const added = await store.addShopping(body.items || body);
-        return sendJson(res, 201, await payload({ message: `장보기에 ${added}개 담았어요` }));
+        const added = await store.addShopping(uid, body.items || body);
+        return sendJson(res, 201, await payload(uid, { message: `장보기에 ${added}개 담았어요` }));
       }
       r = match(p, `/api/shopping/${ID}/toggle`);
       if (r && m === "POST") {
-        await store.toggleShopping(r[1]);
-        return sendJson(res, 200, await payload());
+        await store.toggleShopping(uid, r[1]);
+        return sendJson(res, 200, await payload(uid));
       }
       r = match(p, `/api/shopping/${ID}`);
       if (r && m === "DELETE") {
-        await store.removeShopping(r[1]);
-        return sendJson(res, 200, await payload());
+        await store.removeShopping(uid, r[1]);
+        return sendJson(res, 200, await payload(uid));
       }
       if (p === "/api/shopping/clear-done" && m === "POST") {
-        const n = await store.clearDoneShopping();
-        return sendJson(res, 200, await payload({ message: `${n}개 비웠어요` }));
+        const n = await store.clearDoneShopping(uid);
+        return sendJson(res, 200, await payload(uid, { message: `${n}개 비웠어요` }));
       }
       if (p === "/api/shopping/stock-up" && m === "POST") {
-        const n = await store.stockUp();
-        return sendJson(res, 200, await payload({ message: `${n}개를 냉장고에 넣었어요 (유통기한 7일로 임시 설정)` }));
+        const n = await store.stockUp(uid);
+        return sendJson(res, 200, await payload(uid, { message: `${n}개를 냉장고에 넣었어요 (유통기한 7일로 임시 설정)` }));
       }
 
       /* ----- 초기화 ----- */
       if (p === "/api/reset" && m === "POST") {
-        const n = await store.reset();
-        return sendJson(res, 200, await payload({ message: `초기 데이터 ${n}개로 되돌렸어요` }));
+        const n = await store.reset(uid);
+        return sendJson(res, 200, await payload(uid, { message: `초기 데이터 ${n}개로 되돌렸어요` }));
       }
 
       return sendJson(res, 404, { detail: "없는 엔드포인트" });
@@ -360,4 +429,4 @@ async function apiHandler(req, res) {
   return handle(req, res);
 }
 
-module.exports = { handle, apiHandler, store, pool, ensureReady, sslOption, info, AI_ON, DEMO, PORT };
+module.exports = { handle, apiHandler, store, pool, ensureReady, sslOption, info, AI_ON, DEMO, JWT_TEMP, PORT };
