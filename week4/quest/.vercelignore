@@ -1,0 +1,14 @@
+node_modules
+.env
+.env.*
+
+# 로컬 전용 — 배포에 있으면 Vercel 이 이걸 앱 진입점으로 잡아
+# 정적 index.html 대신 서버 하나로 말아버린다. 배포에서는 api/index.js 가 함수로 동작한다.
+server.js
+dev-mem.js
+
+# 테스트는 배포에 필요 없다
+test-db.js
+test-api.js
+test-ai.js
+README.md

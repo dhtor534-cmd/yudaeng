@@ -64,6 +64,25 @@
   </p>
 
   <div class="grid">
+    <a class="item" href="quest/index.html">
+      <div class="head">
+        <span class="ico">🧊</span>
+        <h2>냉장고 파먹기</h2>
+        <span class="tags">
+          <span class="tag">재료 · 레시피 관리</span>
+          <span class="tag">AI 레시피 생성</span>
+          <span class="tag need">서버 + DB 필요</span>
+        </span>
+      </div>
+      <p>
+        집에 있는 재료를 등록하면 지금 만들 수 있는 요리를 매칭률 순으로 보여줍니다. 유통기한은 D-day 로 계산해
+        임박한 재료부터 쓰게 정렬하고, <b>요리 완료</b>를 누르면 쓴 만큼 재료가 차감됩니다 — 여러 재료를 한꺼번에
+        깎으므로 트랜잭션으로 묶었습니다. 모자란 재료는 장보기 목록으로 모이고, 사 온 것은 다시 냉장고로 옮깁니다.
+        있는 재료만으로 만들 수 있는 새 레시피를 OpenAI 가 만들어 주기도 합니다 — 모델이 지어낸 재료는 걸러서 저장합니다.
+      </p>
+      <div class="run">폴더 <b>quest/</b> · <b>npm install</b> → <b>node server.js</b> → localhost:8791</div>
+    </a>
+
     <a class="item" href="catfood/index.html">
       <div class="head">
         <span class="ico">🐈</span>

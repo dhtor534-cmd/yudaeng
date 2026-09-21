@@ -1,0 +1,10 @@
+# 환경 변수 / API 키 — 절대 커밋하지 않음
+.env
+.env.*
+!.env.example
+
+# 의존성 — 각 폴더에서 npm install 로 받는다
+node_modules/
+
+# 받아둔 스킬 저장소 원본 — 필요한 것만 .claude/skills/ 로 복사해 쓴다
+skills-main/
