@@ -78,7 +78,7 @@ fakeOpenAI.listen(0, "127.0.0.1", () => {
   const port = Number(process.env.PORT);
 
   server.listen(port, async () => {
-    console.log(`냉장고 파먹기 (개발용) → http://localhost:${port}`);
+    console.log(`냉장고 재료 & 레시피 (개발용) → http://localhost:${port}`);
     console.log("  DB: pg-mem (메모리) · AI: 가짜 응답");
     console.log("  ⚠ 데이터는 서버를 끄면 사라집니다. 진짜로 쓰려면 .env 를 채우고 node server.js 를 쓰세요.");
     try {

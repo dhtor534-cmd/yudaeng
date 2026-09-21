@@ -10,7 +10,7 @@ const server = http.createServer(handle);
 
 if (require.main === module) {
   server.listen(PORT, async () => {
-    console.log(`냉장고 파먹기 → http://localhost:${PORT}`);
+    console.log(`냉장고 재료 & 레시피 → http://localhost:${PORT}`);
     if (!pool) {
       console.log("  DATABASE_URL 없음 — .env 를 만들고 다시 실행하세요. (또는 node dev-mem.js)");
       return;

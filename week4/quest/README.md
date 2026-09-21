@@ -1,4 +1,4 @@
-# 냉장고 파먹기 🧊 — 재료 & 레시피 관리 앱
+# 냉장고 재료 & 레시피 🧊
 
 집에 있는 재료를 등록하면 **지금 바로 만들 수 있는 요리**를 매칭률 순으로 알려주는 앱.
 화면은 빌드 없이 `index.html` 하나에 React 18 + Babel standalone(CDN),
@@ -156,10 +156,11 @@ Supabase 없이도, OpenAI 없이도 돌아간다.
 `pg` 자리에 **pg-mem**(인메모리 PostgreSQL)을, OpenAI 자리에 **가짜 HTTP 서버**를 끼워 넣고 같은 코드를 실행한다.
 
 ```bash
-npm test           # 68개 (db 23 + api 25 + ai 20)
+npm test           # 77개 (db 23 + api 26 + ai 21 + demo 7)
 npm run test:db    # db.js 쿼리 로직
 npm run test:api   # 진짜 HTTP 요청으로 라우팅·상태코드·롤백 확인
 npm run test:ai    # AI 경로 — 응답 검증·폴백·오류 처리·동시성
+npm run test:demo  # DATABASE_URL 없을 때 메모리 DB 로 도는지
 ```
 
 ## 구조
@@ -177,6 +178,7 @@ quest/
   test-db.js    db.js 검사 (pg-mem)
   test-api.js   라우팅 검사 (pg-mem + 실제 HTTP)
   test-ai.js    AI 경로 검사 (pg-mem + 가짜 OpenAI)
+  test-demo.js  데모 모드 검사 (DATABASE_URL 없을 때)
   .env          접속 정보 (git 에 안 올라감)
 ```
 

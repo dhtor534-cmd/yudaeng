@@ -217,7 +217,7 @@ const find = (state, name) => state.ingredients.find((i) => i.name === name);
     const res = await fetch(base + "/");
     assert.strictEqual(res.status, 200);
     const html = await res.text();
-    assert.ok(html.includes("냉장고 파먹기"), "index.html 이 아님");
+    assert.ok(html.includes("냉장고 재료"), "index.html 이 아님");
   });
 
   await test(".env 는 못 내려받는다", async () => {
