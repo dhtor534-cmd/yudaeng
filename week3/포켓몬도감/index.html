@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>관동도감 — PokéAPI 라이브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=Russo+One&display=swap" />
+<style>
+  :root {
+    --bg: #E7E9ED; --shell: #D6273A; --shell-2: #B31F30; --shell-ink: #fff;
+    --panel: #F5F6F9; --screen: #FFFFFF; --ink: #1B1E24; --dim: #5B6472;
+    --line: #D7DCE4; --lens: #2F8FD4; --lens-soft: rgba(47,143,212,.12);
+    --led-y: #E9C63B; --led-g: #4FBE76; --bar-track: #E4E8EE;
+    --shadow: 0 28px 56px -28px rgba(20,25,45,.38);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111318; --shell: #CC2537; --shell-2: #8E1826; --shell-ink: #FDECEE;
+      --panel: #1B1F27; --screen: #0E1118; --ink: #E9EDF3; --dim: #8C96A5;
+      --line: #2B313C; --lens: #4BA6E8; --lens-soft: rgba(75,166,232,.16);
+      --bar-track: #232A34; --shadow: 0 30px 66px -28px rgba(0,0,0,.72);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111318; --shell: #CC2537; --shell-2: #8E1826; --shell-ink: #FDECEE;
+    --panel: #1B1F27; --screen: #0E1118; --ink: #E9EDF3; --dim: #8C96A5;
+    --line: #2B313C; --lens: #4BA6E8; --lens-soft: rgba(75,166,232,.16);
+    --bar-track: #232A34; --shadow: 0 30px 66px -28px rgba(0,0,0,.72);
+  }
+  * { box-sizing: border-box; }
+  img { max-width: 100%; }
+  body {
+    margin: 0; min-height: 100vh;
+    background: radial-gradient(1200px 600px at 15% -10%, var(--lens-soft), transparent 60%), var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans KR", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center;
+    padding: clamp(1rem, 4vw, 3rem) clamp(.8rem, 3vw, 2rem) 3rem;
+  }
+  .intro { width: 100%; max-width: 980px; margin-bottom: 1.4rem; }
+  .intro h1 { font-family: "Russo One", "IBM Plex Sans KR", sans-serif; font-size: clamp(1.7rem, 4.5vw, 2.6rem); margin: 0; }
+  .intro p { margin: .5rem 0 0; color: var(--dim); font-size: .92rem; max-width: 62ch; }
+  .intro a { color: var(--lens); text-decoration: none; }
+  .intro a:hover { text-decoration: underline; }
+  .intro .live {
+    display: inline-flex; align-items: center; gap: .45rem; margin-top: .7rem;
+    font-family: "IBM Plex Mono", monospace; font-size: .72rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .intro .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--led-g); }
+
+  .dex {
+    width: 100%; max-width: 980px;
+    background: linear-gradient(180deg, var(--shell), var(--shell-2));
+    border-radius: 14px; padding: 14px; box-shadow: var(--shadow);
+  }
+  .dex__top { display: flex; align-items: center; gap: 14px; padding: 4px 6px 14px; color: var(--shell-ink); }
+  .lens {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: radial-gradient(circle at 32% 30%, #cfeaff, var(--lens) 55%, #0c3f66);
+    border: 3px solid rgba(255,255,255,.75); flex-shrink: 0;
+    box-shadow: 0 0 0 2px rgba(0,0,0,.15);
+  }
+  .leds { display: flex; gap: 7px; }
+  .leds i { width: 11px; height: 11px; border-radius: 50%; display: block; border: 1px solid rgba(0,0,0,.2); }
+  .leds i:nth-child(1) { background: var(--led-y); }
+  .leds i:nth-child(2) { background: var(--led-g); }
+  .dex__title {
+    margin-left: auto; text-align: right; font-family: "Russo One", sans-serif;
+    letter-spacing: .14em; font-size: .82rem; text-transform: uppercase; opacity: .92;
+  }
+  .dex__body { display: grid; grid-template-columns: 288px 1fr; gap: 12px; }
+
+  .roster {
+    background: var(--panel); border-radius: 8px; padding: 8px;
+    display: flex; flex-direction: column; gap: 6px; max-height: 620px; overflow-y: auto;
+  }
+  .roster__label {
+    font-family: "IBM Plex Mono", monospace; font-size: .64rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--dim); padding: 6px 8px 4px;
+  }
+  .entry {
+    display: grid; grid-template-columns: auto 44px 1fr; align-items: center; gap: 10px;
+    padding: 8px 10px; border: 1px solid transparent; border-radius: 7px; background: transparent;
+    cursor: pointer; text-align: left; color: var(--ink); font: inherit;
+    transition: background .15s, border-color .15s;
+  }
+  .entry:hover { background: var(--lens-soft); }
+  .entry[aria-current="true"] { background: var(--lens-soft); border-color: var(--lens); }
+  .entry__no { font-family: "IBM Plex Mono", monospace; font-size: .72rem; color: var(--dim); font-variant-numeric: tabular-nums; }
+  .entry[aria-current="true"] .entry__no { color: var(--lens); font-weight: 600; }
+  .entry__thumb { width: 44px; height: 44px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(0,0,0,.18)); }
+  .entry__name { font-weight: 600; font-size: .98rem; line-height: 1.2; }
+  .entry__sub { font-size: .7rem; color: var(--dim); }
+  .entry:focus-visible { outline: 2px solid var(--lens); outline-offset: 1px; }
+
+  .screen {
+    background: var(--screen); border-radius: 8px; border: 1px solid var(--line);
+    padding: clamp(1rem, 3vw, 1.6rem); position: relative; overflow: hidden; min-height: 420px;
+  }
+  .screen__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .4rem .9rem; }
+  .screen__no { font-family: "IBM Plex Mono", monospace; color: var(--lens); font-weight: 600; font-size: .9rem; }
+  .screen__name { font-weight: 700; font-size: clamp(1.6rem, 5vw, 2.3rem); margin: 0; line-height: 1.1; }
+  .screen__en { font-family: "Russo One", sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); font-size: .82rem; }
+  .screen__genus { width: 100%; color: var(--dim); font-size: .86rem; margin-top: .1rem; }
+
+  .types { display: flex; gap: .4rem; margin-top: .8rem; }
+  .type { font-weight: 600; font-size: .76rem; padding: .28rem .75rem; border-radius: 999px; letter-spacing: .03em; }
+
+  .stage {
+    margin: 1rem 0 .4rem; display: grid; place-items: center; padding: 1.2rem 0; border-radius: 10px;
+    background:
+      radial-gradient(circle at 50% 45%, var(--lens-soft), transparent 62%),
+      repeating-linear-gradient(0deg, transparent 0 13px, var(--line) 13px 14px),
+      repeating-linear-gradient(90deg, transparent 0 13px, var(--line) 13px 14px);
+  }
+  .stage__ring {
+    width: min(58vw, 260px); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+    position: relative;
+  }
+  .stage__ring::before { content: ""; position: absolute; inset: 0; border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--lens) 45%, transparent); }
+  .stage img { width: 82%; height: 82%; object-fit: contain; filter: drop-shadow(0 12px 18px rgba(0,0,0,.25)); animation: floaty 5s ease-in-out infinite; }
+  @keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+
+  .readout { border: 1px solid var(--line); border-radius: 8px; padding: .85rem 1rem; margin-top: .9rem; }
+  .readout__label {
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--lens); display: block; margin-bottom: .35rem;
+  }
+  .readout p { margin: 0; font-size: .95rem; }
+
+  .phys { display: grid; grid-template-columns: 1fr 1fr; gap: .9rem; margin-top: .9rem; }
+  .phys div { border: 1px solid var(--line); border-radius: 8px; padding: .7rem .9rem; }
+  .phys dt { font-family: "IBM Plex Mono", monospace; font-size: .62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--dim); }
+  .phys dd { margin: .15rem 0 0; font-family: "IBM Plex Mono", monospace; font-size: 1.15rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  .stats { margin-top: 1.1rem; display: flex; flex-direction: column; gap: .5rem; }
+  .stats__head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: "IBM Plex Mono", monospace; font-size: .62rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--lens);
+  }
+  .stats__total { color: var(--dim); }
+  .stats__total b { color: var(--ink); font-size: .9rem; }
+  .stat { display: grid; grid-template-columns: 78px 40px 1fr; align-items: center; gap: .7rem; }
+  .stat__k { font-size: .78rem; color: var(--dim); }
+  .stat__v { font-family: "IBM Plex Mono", monospace; font-size: .82rem; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .stat__bar { display: block; height: 8px; border-radius: 999px; background: var(--bar-track); overflow: hidden; }
+  .stat__fill { display: block; height: 8px; border-radius: 999px; background: var(--lens); width: 0; transition: width .6s cubic-bezier(.2,.7,.2,1); }
+  .stat__fill.is-low { background: #E0A83B; }
+  .stat__fill.is-high { background: var(--led-g); }
+
+  .abil { margin-top: 1.1rem; }
+  .abil .readout__label { margin-bottom: .5rem; }
+  .abil__list { display: flex; flex-wrap: wrap; gap: .45rem; }
+  .abil__chip { border: 1px solid var(--line); border-radius: 7px; padding: .32rem .7rem; font-size: .82rem; }
+  .abil__chip small { color: var(--dim); font-family: "IBM Plex Mono", monospace; font-size: .66rem; margin-left: .35rem; }
+  .abil__chip.hidden-abil { border-style: dashed; }
+
+  .nav { margin-top: 1.3rem; display: flex; justify-content: space-between; gap: .6rem; }
+  .nav button {
+    flex: 1; font: inherit; font-weight: 600; font-size: .85rem; padding: .6rem .8rem;
+    border-radius: 7px; border: 1px solid var(--line); background: var(--panel); color: var(--ink);
+    cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .nav button:hover { border-color: var(--lens); background: var(--lens-soft); }
+  .nav button:focus-visible { outline: 2px solid var(--lens); outline-offset: 1px; }
+
+  .state {
+    display: grid; place-items: center; text-align: center; gap: .8rem;
+    min-height: 380px; padding: 2rem; color: var(--dim);
+  }
+  .spinner {
+    width: 42px; height: 42px; border-radius: 50%;
+    border: 4px solid var(--line); border-top-color: var(--lens);
+    animation: spin .9s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .state code { font-family: "IBM Plex Mono", monospace; background: var(--panel); padding: .1rem .35rem; border-radius: 4px; }
+  .state button {
+    font: inherit; font-weight: 600; padding: .55rem 1rem; border-radius: 7px;
+    border: 1px solid var(--lens); background: var(--lens-soft); color: var(--ink); cursor: pointer;
+  }
+
+  .foot { width: 100%; max-width: 980px; margin-top: 1.3rem; font-size: .78rem; color: var(--dim); line-height: 1.6; }
+  .foot code { font-family: "IBM Plex Mono", monospace; background: var(--panel); padding: .1rem .35rem; border-radius: 4px; }
+
+  @media (max-width: 780px) {
+    .dex__body { grid-template-columns: 1fr; }
+    .roster { flex-direction: row; max-height: none; overflow-x: auto; overflow-y: hidden; }
+    .roster__label { display: none; }
+    .entry { grid-template-columns: 1fr; justify-items: center; gap: 3px; min-width: 92px; text-align: center; }
+    .entry__sub { display: none; }
+    .entry__name { font-size: .82rem; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>관동도감</h1>
+  <p>
+    1세대 포켓몬 5마리 — 이상해씨 · 파이리 · 꼬부기 · 피카츄 · 또가스.
+    항목을 클릭하면 상세 정보가 뜹니다. 이 페이지는 열릴 때
+    <a href="https://pokeapi.co" target="_blank" rel="noopener">PokéAPI</a> 서버에
+    <code>fetch()</code>로 직접 요청해 데이터를 가져옵니다.
+  </p>
+  <span class="live">live · pokeapi.co/api/v2</span>
+</div>
+
+<div class="dex">
+  <div class="dex__top">
+    <span class="lens" aria-hidden="true"></span>
+    <span class="leds" aria-hidden="true"><i></i><i></i></span>
+    <span class="dex__title">Kanto Poké&#8202;dex</span>
+  </div>
+  <div class="dex__body">
+    <div class="roster" id="roster" role="listbox" aria-label="포켓몬 목록"></div>
+    <div class="screen" id="screen" aria-live="polite">
+      <div class="state"><div class="spinner"></div><p>PokéAPI에서 도감 데이터를 불러오는 중…</p></div>
+    </div>
+  </div>
+</div>
+
+<p class="foot">
+  데이터 출처: <code>https://pokeapi.co/api/v2/pokemon/{id}</code> 와 <code>/pokemon-species/{id}</code>.
+  한국어 이름·분류·도감 설명은 species 응답의 <code>language.name === "ko"</code> 항목에서 고릅니다.
+  일러스트는 <code>sprites.other["official-artwork"].front_default</code>.
+</p>
+
+<script>
+(function () {
+  var IDS = [1, 4, 7, 25, 109];
+  var API = "https://pokeapi.co/api/v2";
+
+  var TYPE = {
+    grass:    { ko: "풀",   c: "#5FBD58", t: "#0d2b0b" },
+    poison:   { ko: "독",   c: "#A45DB0", t: "#ffffff" },
+    fire:     { ko: "불꽃", c: "#FF9D55", t: "#3a1c00" },
+    water:    { ko: "물",   c: "#5090D6", t: "#ffffff" },
+    electric: { ko: "전기", c: "#F4D23C", t: "#3a2f00" },
+    normal:   { ko: "노말", c: "#9099A1", t: "#ffffff" },
+    flying:   { ko: "비행", c: "#8FA9DE", t: "#10203a" },
+    bug:      { ko: "벌레", c: "#91C12F", t: "#16250a" },
+    ground:   { ko: "땅",   c: "#D97845", t: "#ffffff" },
+    fairy:    { ko: "페어리", c: "#EC8FE6", t: "#3a1636" }
+  };
+  var STAT = {
+    "hp": "HP", "attack": "공격", "defense": "방어",
+    "special-attack": "특수공격", "special-defense": "특수방어", "speed": "스피드"
+  };
+  var ABILITY = {
+    overgrow: "심록", chlorophyll: "엽록소", blaze: "맹화", "solar-power": "선파워",
+    torrent: "급류", "rain-dish": "젖은 접시", static: "정전기", "lightning-rod": "피뢰침",
+    levitate: "부유", "neutralizing-gas": "중화가스", stench: "악취"
+  };
+
+  var roster = document.getElementById("roster");
+  var screen = document.getElementById("screen");
+  var DATA = [];
+  var current = 0;
+
+  function pick(entries, key) {
+    var ko = entries.filter(function (e) { return e.language.name === "ko"; });
+    var en = entries.filter(function (e) { return e.language.name === "en"; });
+    var src = ko.length ? ko : en;
+    return src.length ? (src[0][key] || "").replace(/\s+/g, " ").trim() : "";
+  }
+
+  async function loadOne(id) {
+    var res = await Promise.all([
+      fetch(API + "/pokemon/" + id),
+      fetch(API + "/pokemon-species/" + id)
+    ]);
+    if (!res[0].ok || !res[1].ok) throw new Error("HTTP " + res[0].status + "/" + res[1].status);
+    var p = await res[0].json();
+    var s = await res[1].json();
+    return {
+      id: p.id,
+      name: pick(s.names, "name") || p.name,
+      nameEn: p.name,
+      genus: pick(s.genera, "genus"),
+      flavor: pick(s.flavor_text_entries, "flavor_text"),
+      types: p.types.sort(function (a, b) { return a.slot - b.slot; }).map(function (t) { return t.type.name; }),
+      heightM: p.height / 10,
+      weightKg: p.weight / 10,
+      abilities: p.abilities.map(function (a) { return { en: a.ability.name, hidden: a.is_hidden }; }),
+      stats: p.stats.map(function (st) { return { key: st.stat.name, base: st.base_stat }; }),
+      statTotal: p.stats.reduce(function (n, st) { return n + st.base_stat; }, 0),
+      art: (((p.sprites.other || {})["official-artwork"] || {}).front_default) || p.sprites.front_default
+    };
+  }
+
+  function typeBadge(en) {
+    var m = TYPE[en] || { ko: en, c: "#888", t: "#fff" };
+    return '<span class="type" style="background:' + m.c + ';color:' + m.t + '">' + m.ko + "</span>";
+  }
+
+  function buildRoster() {
+    var html = '<span class="roster__label">No. 001 – 151</span>';
+    DATA.forEach(function (p, i) {
+      html +=
+        '<button class="entry" role="option" data-i="' + i + '" aria-current="' + (i === current) + '">' +
+          '<span class="entry__no">No.' + String(p.id).padStart(3, "0") + "</span>" +
+          '<img class="entry__thumb" src="' + p.art + '" alt="" loading="lazy" />' +
+          "<span><span class='entry__name'>" + p.name + "</span><br />" +
+          "<span class='entry__sub'>" + p.types.map(function (t) { return (TYPE[t] || {}).ko || t; }).join(" · ") + "</span></span>" +
+        "</button>";
+    });
+    roster.innerHTML = html;
+  }
+
+  function render(i) {
+    current = (i + DATA.length) % DATA.length;
+    var p = DATA[current];
+    var MAX = 180;
+
+    var statRows = p.stats.map(function (s) {
+      var pct = Math.min(100, (s.base / MAX) * 100);
+      var cls = s.base < 50 ? " is-low" : s.base >= 90 ? " is-high" : "";
+      return '<div class="stat"><span class="stat__k">' + (STAT[s.key] || s.key) + "</span>" +
+        '<span class="stat__v">' + s.base + "</span>" +
+        '<span class="stat__bar"><span class="stat__fill' + cls + '" style="width:' + pct.toFixed(1) + '%"></span></span></div>';
+    }).join("");
+
+    var abilChips = p.abilities.map(function (a) {
+      return '<span class="abil__chip' + (a.hidden ? " hidden-abil" : "") + '">' +
+        (ABILITY[a.en] || a.en) + "<small>" + (a.hidden ? "숨겨진 특성" : a.en) + "</small></span>";
+    }).join("");
+
+    screen.innerHTML =
+      '<div class="screen__head">' +
+        '<span class="screen__no">No.' + String(p.id).padStart(3, "0") + "</span>" +
+        '<h2 class="screen__name">' + p.name + "</h2>" +
+        '<span class="screen__en">' + p.nameEn + "</span>" +
+        '<span class="screen__genus">' + (p.genus || "") + "</span>" +
+      "</div>" +
+      '<div class="types">' + p.types.map(typeBadge).join("") + "</div>" +
+      '<div class="stage"><div class="stage__ring"><img src="' + p.art + '" alt="' + p.name + ' 공식 일러스트" /></div></div>' +
+      '<div class="readout"><span class="readout__label">도감 설명</span><p>' + (p.flavor || "설명 없음") + "</p></div>" +
+      '<dl class="phys"><div><dt>신장</dt><dd>' + p.heightM.toFixed(1) + " m</dd></div>" +
+        "<div><dt>체중</dt><dd>" + p.weightKg.toFixed(1) + " kg</dd></div></dl>" +
+      '<div class="stats"><div class="stats__head"><span>종족값</span>' +
+        '<span class="stats__total">합계 <b>' + p.statTotal + "</b></span></div>" + statRows + "</div>" +
+      '<div class="abil"><span class="readout__label">특성</span><div class="abil__list">' + abilChips + "</div></div>" +
+      '<div class="nav"><button type="button" data-nav="-1">◀ 이전</button>' +
+        '<button type="button" data-nav="1">다음 ▶</button></div>';
+
+    roster.querySelectorAll(".entry").forEach(function (btn) {
+      btn.setAttribute("aria-current", Number(btn.dataset.i) === current);
+    });
+  }
+
+  function showError(msg) {
+    screen.innerHTML =
+      '<div class="state"><p>PokéAPI 요청에 실패했습니다.<br /><code>' + msg + "</code></p>" +
+      "<p>네트워크 연결을 확인하고 다시 시도하세요.</p>" +
+      '<button type="button" id="retry">다시 시도</button></div>';
+    document.getElementById("retry").addEventListener("click", boot);
+  }
+
+  roster.addEventListener("click", function (e) {
+    var btn = e.target.closest(".entry");
+    if (btn) render(Number(btn.dataset.i));
+  });
+  screen.addEventListener("click", function (e) {
+    var btn = e.target.closest("[data-nav]");
+    if (btn) { render(current + Number(btn.dataset.nav)); screen.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!DATA.length) return;
+    if (e.key === "ArrowDown" || e.key === "ArrowRight") { render(current + 1); e.preventDefault(); }
+    if (e.key === "ArrowUp" || e.key === "ArrowLeft") { render(current - 1); e.preventDefault(); }
+  });
+
+  async function boot() {
+    screen.innerHTML = '<div class="state"><div class="spinner"></div><p>PokéAPI에서 도감 데이터를 불러오는 중…</p></div>';
+    try {
+      DATA = await Promise.all(IDS.map(loadOne));
+      current = 0;
+      buildRoster();
+      render(0);
+    } catch (err) {
+      showError(err.message || String(err));
+    }
+  }
+
+  boot();
+})();
+</script>
+</body>
+</html>

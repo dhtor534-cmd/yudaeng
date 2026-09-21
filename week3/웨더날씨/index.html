@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>웨더날씨 — OpenWeatherMap 라이브</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" />
+<style>
+  :root {
+    --bg: #EAEEF3; --card: #FFFFFF; --ink: #1A1E26; --dim: #5C6675;
+    --line: #DCE2EA; --accent: #2F7DD1; --accent-soft: rgba(47,125,209,.10);
+    --warm: #E0892F; --cool: #3D9AD1; --good: #4FBE76;
+    --shadow: 0 24px 50px -26px rgba(20,30,55,.34);
+    --sky-top: #7FB2E5; --sky-bot: #C9DEF2;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1218; --card: #171B23; --ink: #E8EDF4; --dim: #8B95A5;
+      --line: #262D39; --accent: #4BA3EC; --accent-soft: rgba(75,163,236,.14);
+      --shadow: 0 28px 60px -26px rgba(0,0,0,.7);
+      --sky-top: #24384f; --sky-bot: #16202c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1218; --card: #171B23; --ink: #E8EDF4; --dim: #8B95A5;
+    --line: #262D39; --accent: #4BA3EC; --accent-soft: rgba(75,163,236,.14);
+    --shadow: 0 28px 60px -26px rgba(0,0,0,.7);
+    --sky-top: #24384f; --sky-bot: #16202c;
+  }
+  * { box-sizing: border-box; }
+  img { max-width: 100%; }
+  body {
+    margin: 0; min-height: 100vh;
+    background:
+      radial-gradient(1100px 520px at 12% -12%, var(--accent-soft), transparent 60%),
+      var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans KR", system-ui, -apple-system, "Malgun Gothic", sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column; align-items: center;
+    padding: clamp(1rem, 4vw, 3rem) clamp(.8rem, 3vw, 2rem) 3rem;
+  }
+
+  .wrap { width: 100%; max-width: 880px; }
+
+  .intro { margin-bottom: 1.3rem; }
+  .intro h1 { font-size: clamp(1.6rem, 4.5vw, 2.4rem); margin: 0; letter-spacing: -.01em; }
+  .intro p { margin: .5rem 0 0; color: var(--dim); font-size: .9rem; max-width: 60ch; }
+  .intro .live {
+    display: inline-flex; align-items: center; gap: .45rem; margin-top: .7rem;
+    font-family: "IBM Plex Mono", monospace; font-size: .7rem; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--dim);
+  }
+  .intro .live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); }
+
+  form.search { display: flex; gap: .5rem; margin-bottom: 1.1rem; }
+  form.search input {
+    flex: 1; font: inherit; padding: .7rem .9rem; border-radius: 9px;
+    border: 1px solid var(--line); background: var(--card); color: var(--ink);
+  }
+  form.search input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  form.search button {
+    font: inherit; font-weight: 600; padding: .7rem 1.1rem; border-radius: 9px;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff; cursor: pointer;
+  }
+  form.search button.ghost { background: var(--card); color: var(--ink); border-color: var(--line); }
+  form.search button:hover { filter: brightness(1.05); }
+
+  .chips { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: 1.3rem; }
+  .chips button {
+    font: inherit; font-size: .82rem; padding: .32rem .8rem; border-radius: 999px;
+    border: 1px solid var(--line); background: var(--card); color: var(--dim); cursor: pointer;
+  }
+  .chips button:hover { border-color: var(--accent); color: var(--ink); }
+
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow); overflow: hidden;
+  }
+
+  .now {
+    display: grid; grid-template-columns: 1fr auto; gap: 1rem;
+    padding: clamp(1.1rem, 4vw, 1.8rem);
+    background: linear-gradient(160deg, var(--sky-top), var(--sky-bot));
+    color: #10202f;
+  }
+  :root[data-theme="dark"] .now, :root:not([data-theme="light"]) .now { color: var(--ink); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .now { color: var(--ink); } }
+  .now__place { font-weight: 700; font-size: 1.15rem; }
+  .now__place small { font-weight: 500; opacity: .7; font-size: .8rem; margin-left: .35rem; }
+  .now__temp { font-size: clamp(2.8rem, 11vw, 4.2rem); font-weight: 700; line-height: 1; margin: .3rem 0 .1rem; font-variant-numeric: tabular-nums; }
+  .now__desc { font-size: .98rem; }
+  .now__feels { font-size: .82rem; opacity: .8; margin-top: .15rem; }
+  .now__icon { align-self: center; width: clamp(90px, 26vw, 130px); filter: drop-shadow(0 8px 14px rgba(0,0,0,.2)); }
+
+  .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); }
+  .metric { background: var(--card); padding: .85rem .6rem; text-align: center; }
+  .metric dt { font-family: "IBM Plex Mono", monospace; font-size: .58rem; letter-spacing: .12em; text-transform: uppercase; color: var(--dim); margin: 0; }
+  .metric dd { margin: .25rem 0 0; font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+  section.block { padding: clamp(1rem, 3.5vw, 1.5rem); border-top: 1px solid var(--line); }
+  .block h2 {
+    font-family: "IBM Plex Mono", monospace; font-size: .64rem; letter-spacing: .16em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 .8rem;
+  }
+
+  .hourly { display: flex; gap: .55rem; overflow-x: auto; padding-bottom: .3rem; }
+  .hour {
+    flex: 0 0 auto; width: 74px; text-align: center; border: 1px solid var(--line);
+    border-radius: 10px; padding: .6rem .3rem;
+  }
+  .hour b { display: block; font-size: .74rem; color: var(--dim); font-weight: 500; }
+  .hour img { width: 42px; height: 42px; }
+  .hour span { display: block; font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: .9rem; }
+  .hour em { display: block; font-style: normal; font-size: .68rem; color: var(--cool); }
+
+  .daily { display: flex; flex-direction: column; gap: .1rem; }
+  .day {
+    display: grid; grid-template-columns: 64px 40px 1fr auto; align-items: center;
+    gap: .7rem; padding: .55rem 0; border-bottom: 1px solid var(--line);
+  }
+  .day:last-child { border-bottom: 0; }
+  .day b { font-weight: 600; font-size: .9rem; }
+  .day img { width: 40px; height: 40px; }
+  .day .rng { font-family: "IBM Plex Mono", monospace; font-size: .88rem; font-variant-numeric: tabular-nums; }
+  .day .rng i { color: var(--dim); font-style: normal; }
+  .day .cond { color: var(--dim); font-size: .82rem; text-align: right; }
+
+  .state { display: grid; place-items: center; text-align: center; gap: .8rem; padding: 3rem 1.5rem; color: var(--dim); }
+  .spinner { width: 40px; height: 40px; border-radius: 50%; border: 4px solid var(--line); border-top-color: var(--accent); animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .state code { font-family: "IBM Plex Mono", monospace; background: var(--accent-soft); padding: .12rem .4rem; border-radius: 4px; word-break: break-all; }
+  .state button { font: inherit; font-weight: 600; padding: .55rem 1.1rem; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--ink); cursor: pointer; }
+
+  .foot { max-width: 880px; margin-top: 1.2rem; font-size: .76rem; color: var(--dim); line-height: 1.7; }
+  .foot code { font-family: "IBM Plex Mono", monospace; background: var(--card); border: 1px solid var(--line); padding: .1rem .35rem; border-radius: 4px; }
+
+  @media (max-width: 560px) {
+    .metrics { grid-template-columns: repeat(2, 1fr); }
+    .now { grid-template-columns: 1fr; }
+    .now__icon { justify-self: start; }
+    .day { grid-template-columns: 56px 34px 1fr; }
+    .day .cond { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="intro">
+    <h1>웨더날씨</h1>
+    <p>
+      도시를 검색하면 <a href="https://openweathermap.org" target="_blank" rel="noopener">OpenWeatherMap</a> 서버에
+      <code>fetch()</code>로 직접 요청해 현재 날씨 · 시간별 예보 · 5일 예보를 실시간으로 가져옵니다.
+    </p>
+    <span class="live">live · api.openweathermap.org/data/2.5</span>
+  </div>
+
+  <form class="search" id="search" autocomplete="off">
+    <input id="q" name="q" placeholder="도시 이름 (예: Seoul, 부산, Tokyo)" aria-label="도시 검색" />
+    <button type="submit">검색</button>
+    <button type="button" class="ghost" id="geo" title="현재 위치">📍</button>
+  </form>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="card" id="card">
+    <div class="state"><div class="spinner"></div><p>날씨 데이터를 불러오는 중…</p></div>
+  </div>
+
+  <p class="foot">
+    데이터 출처: <code>/data/2.5/weather</code> · <code>/data/2.5/forecast</code> (3시간 간격 5일) ·
+    도시 검색은 <code>/geo/1.0/direct</code>, 위치 역지오코딩은 <code>/geo/1.0/reverse</code>.
+    아이콘은 <code>openweathermap.org/img/wn/{code}@2x.png</code>. 단위 <code>metric</code>, 언어 <code>kr</code>.
+  </p>
+
+</div>
+
+<script>
+(function () {
+  var API_KEY = "67bda6dee8f1705d14a31c85a19b15eb"; // OpenWeatherMap — 사용자 키
+  var BASE = "https://api.openweathermap.org";
+  var ICON = function (c) { return "https://openweathermap.org/img/wn/" + c + "@2x.png"; };
+
+  var PRESETS = [
+    { name: "서울", q: "Seoul,KR" },
+    { name: "부산", q: "Busan,KR" },
+    { name: "제주", q: "Jeju,KR" },
+    { name: "도쿄", q: "Tokyo,JP" },
+    { name: "뉴욕", q: "New York,US" },
+    { name: "런던", q: "London,GB" }
+  ];
+
+  var card = document.getElementById("card");
+  var form = document.getElementById("search");
+  var input = document.getElementById("q");
+  var chips = document.getElementById("chips");
+
+  PRESETS.forEach(function (p) {
+    var b = document.createElement("button");
+    b.type = "button";
+    b.textContent = p.name;
+    b.addEventListener("click", function () { loadByQuery(p.q); });
+    chips.appendChild(b);
+  });
+
+  var WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
+
+  function round(n) { return Math.round(n); }
+  function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+  async function getJSON(url) {
+    var res = await fetch(url);
+    var body = await res.json().catch(function () { return {}; });
+    if (!res.ok) {
+      var msg = body && body.message ? body.message : ("HTTP " + res.status);
+      var err = new Error(msg);
+      err.status = res.status;
+      throw err;
+    }
+    return body;
+  }
+
+  function showLoading() {
+    card.innerHTML = '<div class="state"><div class="spinner"></div><p>날씨 데이터를 불러오는 중…</p></div>';
+  }
+
+  function showError(err) {
+    var status = err && err.status;
+    var human;
+    if (status === 401) {
+      human = "API 키가 아직 활성화되지 않았어요. OpenWeatherMap 키는 생성 후 최대 2시간까지 걸립니다. 잠시 뒤 다시 시도하세요.";
+    } else if (status === 404) {
+      human = "그 이름의 도시를 찾지 못했어요. 영문 이름이나 <code>도시,국가코드</code> 형식(예: Seoul,KR)으로 다시 시도해 보세요.";
+    } else if (status === 429) {
+      human = "요청이 너무 잦습니다 (무료 플랜 분당 60회). 잠시 후 다시 시도하세요.";
+    } else {
+      human = "날씨 정보를 불러오지 못했습니다.";
+    }
+    card.innerHTML =
+      '<div class="state"><p>' + human + '</p>' +
+      '<p><code>' + (err && err.message ? err.message : "unknown error") + '</code></p>' +
+      '<button type="button" id="retry">다시 시도</button></div>';
+    document.getElementById("retry").addEventListener("click", function () {
+      if (LAST) LAST(); else loadByQuery("Seoul,KR");
+    });
+  }
+
+  function groupDaily(list, tzOffset) {
+    var days = {};
+    list.forEach(function (item) {
+      var local = new Date((item.dt + tzOffset) * 1000);
+      var key = local.getUTCFullYear() + "-" + (local.getUTCMonth() + 1) + "-" + local.getUTCDate();
+      if (!days[key]) days[key] = { date: local, min: Infinity, max: -Infinity, noon: null, items: [] };
+      var d = days[key];
+      d.min = Math.min(d.min, item.main.temp_min);
+      d.max = Math.max(d.max, item.main.temp_max);
+      d.items.push(item);
+      var hr = local.getUTCHours();
+      if (d.noon === null || Math.abs(hr - 12) < Math.abs(d.noon.hr - 12)) {
+        d.noon = { hr: hr, w: item.weather[0] };
+      }
+    });
+    return Object.keys(days).map(function (k) { return days[k]; }).slice(0, 5);
+  }
+
+  function render(current, forecast) {
+    var tz = current.timezone || 0;
+    var w = current.weather[0];
+    var localNow = new Date((Math.floor(Date.now() / 1000) + tz) * 1000);
+
+    var metrics = [
+      ["체감", round(current.main.feels_like) + "°"],
+      ["습도", current.main.humidity + "%"],
+      ["바람", current.wind.speed.toFixed(1) + " m/s"],
+      ["기압", current.main.pressure + " hPa"],
+      ["최저", round(current.main.temp_min) + "°"],
+      ["최고", round(current.main.temp_max) + "°"],
+      ["구름", (current.clouds && current.clouds.all != null ? current.clouds.all : 0) + "%"],
+      ["가시거리", current.visibility != null ? (current.visibility / 1000).toFixed(1) + " km" : "—"]
+    ];
+
+    var hourly = (forecast.list || []).slice(0, 8).map(function (it) {
+      var lt = new Date((it.dt + tz) * 1000);
+      return '<div class="hour">' +
+        '<b>' + lt.getUTCHours() + '시</b>' +
+        '<img src="' + ICON(it.weather[0].icon) + '" alt="' + it.weather[0].description + '" />' +
+        '<span>' + round(it.main.temp) + '°</span>' +
+        '<em>💧' + Math.round((it.pop || 0) * 100) + '%</em>' +
+      '</div>';
+    }).join("");
+
+    var daily = groupDaily(forecast.list || [], tz).map(function (d, i) {
+      var label = i === 0 ? "오늘" : WEEKDAY[d.date.getUTCDay()] + "요일";
+      var ww = d.noon ? d.noon.w : { icon: "01d", description: "" };
+      return '<div class="day">' +
+        '<b>' + label + '</b>' +
+        '<img src="' + ICON(ww.icon) + '" alt="' + ww.description + '" />' +
+        '<span class="rng">' + round(d.max) + '° <i>/ ' + round(d.min) + '°</i></span>' +
+        '<span class="cond">' + cap(ww.description) + '</span>' +
+      '</div>';
+    }).join("");
+
+    card.innerHTML =
+      '<div class="now">' +
+        '<div>' +
+          '<div class="now__place">' + current.name +
+            (current.sys && current.sys.country ? ' <small>' + current.sys.country + '</small>' : '') +
+          '</div>' +
+          '<div class="now__temp">' + round(current.main.temp) + '°</div>' +
+          '<div class="now__desc">' + cap(w.description) + '</div>' +
+          '<div class="now__feels">체감 ' + round(current.main.feels_like) + '° · ' +
+            localNow.getUTCFullYear() + '.' + String(localNow.getUTCMonth() + 1).padStart(2, "0") + '.' +
+            String(localNow.getUTCDate()).padStart(2, "0") + ' ' +
+            String(localNow.getUTCHours()).padStart(2, "0") + ':' + String(localNow.getUTCMinutes()).padStart(2, "0") +
+            ' 현지</div>' +
+        '</div>' +
+        '<img class="now__icon" src="' + ICON(w.icon) + '" alt="' + w.description + '" />' +
+      '</div>' +
+      '<dl class="metrics">' +
+        metrics.map(function (m) {
+          return '<div class="metric"><dt>' + m[0] + '</dt><dd>' + m[1] + '</dd></div>';
+        }).join("") +
+      '</dl>' +
+      '<section class="block"><h2>시간별 예보 · 3시간 간격</h2><div class="hourly">' + hourly + '</div></section>' +
+      '<section class="block"><h2>5일 예보</h2><div class="daily">' + daily + '</div></section>';
+  }
+
+  var LAST = null;
+
+  async function loadByQuery(q) {
+    LAST = function () { loadByQuery(q); };
+    input.value = q;
+    showLoading();
+    try {
+      var geo = await getJSON(BASE + "/geo/1.0/direct?q=" + encodeURIComponent(q) + "&limit=1&appid=" + API_KEY);
+      if (!geo.length) { var e = new Error("no matching city: " + q); e.status = 404; throw e; }
+      await loadByCoords(geo[0].lat, geo[0].lon, q);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  async function loadByCoords(lat, lon, label) {
+    LAST = function () { loadByCoords(lat, lon, label); };
+    showLoading();
+    try {
+      var common = "lat=" + lat + "&lon=" + lon + "&units=metric&lang=kr&appid=" + API_KEY;
+      var pair = await Promise.all([
+        getJSON(BASE + "/data/2.5/weather?" + common),
+        getJSON(BASE + "/data/2.5/forecast?" + common)
+      ]);
+      render(pair[0], pair[1]);
+    } catch (err) {
+      showError(err);
+    }
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    var q = input.value.trim();
+    if (q) loadByQuery(q);
+  });
+
+  document.getElementById("geo").addEventListener("click", function () {
+    if (!navigator.geolocation) { loadByQuery("Seoul,KR"); return; }
+    showLoading();
+    navigator.geolocation.getCurrentPosition(
+      function (pos) { loadByCoords(pos.coords.latitude, pos.coords.longitude, "현재 위치"); },
+      function () { showError(new Error("위치 권한이 거부되었습니다. 도시를 직접 검색하세요.")); }
+    );
+  });
+
+  loadByQuery("Seoul,KR");
+})();
+</script>
+</body>
+</html>
