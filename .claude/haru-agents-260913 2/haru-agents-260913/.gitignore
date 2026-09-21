@@ -1,0 +1,6 @@
+.playwright-mcp/
+.DS_Store
+_drop_원본/
+.claude/worktrees/
+내조직/
+/조직설정.json
