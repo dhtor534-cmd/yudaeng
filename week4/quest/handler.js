@@ -73,17 +73,29 @@ function sslOption() {
   return local ? false : { rejectUnauthorized: false };
 }
 
-const pool = DATABASE_URL
-  ? new Pool({
+/* DATABASE_URL 이 없으면 데모 모드로 돈다 — 메모리 DB(pg-mem) 를 대신 끼운다.
+   앱을 그냥 구경할 수 있게 하려는 것이고, 진짜 저장은 아니다:
+   서버 인스턴스가 새로 뜨면 시드 상태로 돌아간다. DEMO=off 로 끌 수 있다. */
+const DEMO = !DATABASE_URL && (process.env.DEMO || "").toLowerCase() !== "off";
+
+function makePool() {
+  if (DATABASE_URL) {
+    const p = new Pool({
       connectionString: DATABASE_URL,
       ssl: sslOption(),
       max: Number(process.env.PGPOOL_MAX) || 5,
       connectionTimeoutMillis: 10000,
       idleTimeoutMillis: 30000,
-    })
-  : null;
+    });
+    p.on("error", (e) => console.error("  [pool] 유휴 커넥션 오류:", e.message));
+    return p;
+  }
+  if (!DEMO) return null;
+  const { newDb } = require("pg-mem");
+  return new (newDb().adapters.createPg().Pool)();
+}
 
-if (pool) pool.on("error", (e) => console.error("  [pool] 유휴 커넥션 오류:", e.message));
+const pool = makePool();
 
 const query = async (sql, args) => (await pool.query(sql, args)).rows;
 
@@ -106,7 +118,7 @@ async function tx(fn) {
 const store = pool ? makeStore(query, tx) : null;
 
 let dbReady = false;
-let dbError = DATABASE_URL ? null : "DATABASE_URL 이 없습니다. .env 를 만들고 서버를 다시 실행하세요.";
+let dbError = (DATABASE_URL || DEMO) ? null : "DATABASE_URL 이 없습니다. .env 를 만들고 서버를 다시 실행하세요.";
 
 async function ensureReady() {
   if (!pool) throw Object.assign(new Error(dbError), { status: 503 });
@@ -181,6 +193,7 @@ const payload = async (extra) => Object.assign(
     options: { categories: CATEGORIES, storages: STORAGES, units: UNITS },
     db: info ? { host: info.host, database: info.database } : null,
     ai: { enabled: AI_ON, model: (process.env.OPENAI_MODEL || "gpt-4o-mini").trim() },
+    demo: DEMO,
   },
   extra || {}
 );
@@ -226,6 +239,7 @@ async function handle(req, res) {
         ok: true, connected, detail,
         db: info ? { host: info.host, database: info.database, ssl: !!sslOption() } : null,
         ai: { enabled: AI_ON, model: (process.env.OPENAI_MODEL || "gpt-4o-mini").trim() },
+        demo: DEMO,
       });
     }
 
@@ -346,4 +360,4 @@ async function apiHandler(req, res) {
   return handle(req, res);
 }
 
-module.exports = { handle, apiHandler, store, pool, ensureReady, sslOption, info, AI_ON, PORT };
+module.exports = { handle, apiHandler, store, pool, ensureReady, sslOption, info, AI_ON, DEMO, PORT };

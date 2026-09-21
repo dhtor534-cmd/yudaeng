@@ -1131,6 +1131,16 @@ function App() {
     <div className="wrap">
       {header}
 
+      {data.demo && (
+        <div className="banner info">
+          <div>
+            <b>데모 모드예요.</b> 데이터베이스가 연결되지 않아 메모리에만 저장됩니다 —
+            마음껏 눌러 보셔도 되지만, 잠시 뒤 처음 상태로 돌아갑니다.
+            {!ai.enabled && <> AI 레시피 생성은 <code>OPENAI_API_KEY</code> 를 넣어야 켜집니다.</>}
+          </div>
+        </div>
+      )}
+
       <div className="stats">
         <Stat k="냉장고 재료" v={stats.total} unit="개" />
         <Stat k="임박 (D-2 이내)" v={stats.urgent} unit="개" tone={stats.urgent ? "warn" : null} />
