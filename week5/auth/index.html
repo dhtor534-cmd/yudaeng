@@ -1,0 +1,566 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>회원가입 · 로그인 (JWT)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+KR:wght@400;500;700&display=swap" />
+<style>
+  :root {
+    --bg: #f6f8fc; --ink: #17213c; --navy: #182d69;
+    --brand: #254bdb; --brand-ink: #18349f; --brand-soft: #edf2ff;
+    --paper: #fff; --line: #dce2ec; --line-soft: #e8ecf3;
+    --dim: #52637e; --faint: #8992a3;
+    --ok: #2f9e6b; --ok-soft: #e8f7f0;
+    --warn: #b87b1f; --warn-soft: #fdf3e0;
+    --bad: #d2453c; --bad-soft: #fdecea;
+    --r: 16px; --r-sm: 10px;
+    --shadow: 0 18px 44px -30px rgba(24,45,105,.45);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "DM Sans", "Noto Sans KR", system-ui, -apple-system, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 16px 90px; }
+
+  .eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .15em; text-transform: uppercase; color: var(--brand); }
+  h1 { font-size: 30px; font-weight: 700; letter-spacing: -1px; margin: 9px 0 8px; }
+  .lead { color: var(--dim); font-size: 14px; margin: 0 0 26px; }
+
+  .card {
+    background: var(--paper); border: 1px solid var(--line-soft); border-radius: var(--r);
+    padding: 22px; margin-bottom: 14px; box-shadow: var(--shadow);
+  }
+  .card h2 { font-size: 15px; font-weight: 700; margin: 0 0 4px; letter-spacing: -.2px; }
+  .card .sub { font-size: 12.5px; color: var(--faint); margin: 0 0 16px; }
+
+  .tabs { display: flex; gap: 6px; background: var(--paper); border: 1px solid var(--line-soft);
+          border-radius: 999px; padding: 5px; margin-bottom: 14px; width: fit-content; }
+  .tabs button {
+    border: 0; background: transparent; padding: 8px 22px; border-radius: 999px;
+    font-size: 13.5px; font-weight: 600; color: var(--dim); cursor: pointer; transition: .15s;
+  }
+  .tabs button:hover { color: var(--brand); }
+  .tabs button[aria-selected="true"] { background: var(--brand); color: #fff; }
+
+  label { display: block; font-size: 12px; font-weight: 700; color: var(--dim); margin: 0 0 5px; letter-spacing: .02em; }
+  .field { margin-bottom: 13px; }
+  input[type=text], input[type=email], input[type=password] {
+    width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: var(--r-sm);
+    background: #fff; transition: .15s; font-size: 14px;
+  }
+  input:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+  input:disabled { background: #f4f6fa; color: var(--faint); }
+  .hint { font-size: 11.5px; color: var(--faint); margin-top: 5px; }
+
+  .btn {
+    border: 0; border-radius: var(--r-sm); padding: 11px 18px; font-size: 14px; font-weight: 600;
+    background: var(--brand); color: #fff; cursor: pointer; transition: .15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--brand-ink); }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn.wide { width: 100%; }
+  .btn.ghost { background: transparent; color: var(--dim); border: 1px solid var(--line); }
+  .btn.ghost:hover:not(:disabled) { background: #f4f6fa; color: var(--ink); }
+  .btn.danger { background: transparent; color: var(--bad); border: 1px solid var(--line); }
+  .btn.danger:hover:not(:disabled) { background: var(--bad-soft); border-color: var(--bad); }
+  .btn.sm { padding: 6px 12px; font-size: 12.5px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .note { border-radius: var(--r-sm); padding: 10px 13px; font-size: 13px; margin-bottom: 14px; }
+  .note.bad { background: var(--bad-soft); color: #97302a; }
+  .note.ok { background: var(--ok-soft); color: #1e6b49; }
+  .note.warn { background: var(--warn-soft); color: #8a5a12; }
+
+  .kv { display: grid; grid-template-columns: 96px 1fr; gap: 7px 14px; font-size: 13.5px; }
+  .kv dt { color: var(--faint); font-weight: 600; font-size: 12px; padding-top: 2px; }
+  .kv dd { margin: 0; overflow-wrap: anywhere; }
+
+  .sess { border: 1px solid var(--line-soft); border-radius: var(--r-sm); padding: 12px 14px; margin-bottom: 8px;
+          display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .sess.is-current { border-color: var(--brand); background: var(--brand-soft); }
+  .sess .who { font-size: 13px; font-weight: 600; }
+  .sess .when { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+  .badge { font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+           background: var(--brand); color: #fff; border-radius: 999px; padding: 2px 9px; margin-left: 6px; }
+
+  .token { background: #101833; color: #c8d4f5; border-radius: var(--r-sm); padding: 13px;
+           font-size: 11.5px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+  .token .h { color: #ff9ecb; } .token .p { color: #8fe3c0; } .token .s { color: #ffd68a; }
+  .foot { font-size: 12px; color: var(--faint); margin-top: 26px; text-align: center; }
+  .foot code { background: #eceff5; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.26.4/babel.min.js" crossorigin></script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useCallback, useRef } = React;
+
+/* =========================================================
+   토큰을 어디에 둘 것인가
+   =========================================================
+   액세스 토큰은 이 변수 하나에만 둔다. localStorage 에 넣지 않는다 —
+   거기 넣으면 페이지에 끼어든 아무 스크립트나 읽어 갈 수 있다.
+   대신 새로고침하면 토큰이 날아가는데, 그건 httpOnly 쿠키로 들고 있는
+   리프레시 토큰으로 /api/auth/refresh 를 한 번 불러서 되살린다. */
+let accessToken = null;
+
+/** 액세스 토큰이 만료됐으면 한 번 조용히 새로 받아 오고, 그래도 안 되면 로그아웃 처리한다. */
+async function api(path, { method = "GET", body, retry = true } = {}) {
+  const headers = {};
+  if (body !== undefined) headers["Content-Type"] = "application/json";
+  if (accessToken) headers.Authorization = "Bearer " + accessToken;
+
+  const res = await fetch("/api" + path, {
+    method, headers,
+    body: body === undefined ? undefined : JSON.stringify(body),
+    credentials: "same-origin",           // 리프레시 쿠키를 같이 보낸다
+  });
+
+  let data = null;
+  try { data = await res.json(); } catch { /* 본문 없음 */ }
+  if (data && data.accessToken) accessToken = data.accessToken;
+
+  if (res.status === 401 && retry && path !== "/auth/refresh" && path !== "/auth/login") {
+    const ok = await refresh();
+    if (ok) return api(path, { method, body, retry: false });
+  }
+  if (!res.ok) throw new Error((data && data.detail) || `요청 실패 (${res.status})`);
+  return data;
+}
+
+async function refresh() {
+  try {
+    const res = await fetch("/api/auth/refresh", { method: "POST", credentials: "same-origin" });
+    if (!res.ok) { accessToken = null; return null; }
+    const data = await res.json();
+    accessToken = data.accessToken;
+    return data;
+  } catch { accessToken = null; return null; }
+}
+
+/* ---------- 보기 좋게 ---------- */
+
+const when = (iso) => {
+  if (!iso) return "-";
+  const d = new Date(iso);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
+
+const ago = (iso) => {
+  const s = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (s < 60) return "방금";
+  if (s < 3600) return Math.floor(s / 60) + "분 전";
+  if (s < 86400) return Math.floor(s / 3600) + "시간 전";
+  return Math.floor(s / 86400) + "일 전";
+};
+
+/** user-agent 에서 사람이 알아볼 만한 것만 뽑는다 */
+function deviceName(ua) {
+  if (!ua) return "알 수 없는 기기";
+  const os = /Windows/.test(ua) ? "Windows" : /Mac OS X|Macintosh/.test(ua) ? "Mac"
+           : /Android/.test(ua) ? "Android" : /iPhone|iPad/.test(ua) ? "iOS" : "";
+  const br = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome"
+           : /Safari\//.test(ua) ? "Safari" : /Firefox\//.test(ua) ? "Firefox" : "";
+  return [os, br].filter(Boolean).join(" · ") || ua.slice(0, 40);
+}
+
+/** JWT 를 갈라서 보여주기 위한 것 — 검증이 아니라 구경용이다. 진짜 검증은 서버가 한다. */
+function peekJwt(token) {
+  try {
+    const [h, p, s] = token.split(".");
+    const dec = (x) => JSON.parse(atob(x.replace(/-/g, "+").replace(/_/g, "/")));
+    return { header: dec(h), payload: dec(p), signature: s };
+  } catch { return null; }
+}
+
+/* =========================================================
+   화면
+   ========================================================= */
+
+function Notice({ kind, children }) {
+  if (!children) return null;
+  return <div className={"note " + kind}>{children}</div>;
+}
+
+function Field({ label, hint, ...rest }) {
+  return (
+    <div className="field">
+      <label>{label}</label>
+      <input {...rest} />
+      {hint ? <div className="hint">{hint}</div> : null}
+    </div>
+  );
+}
+
+/* ---------- 로그인 안 된 상태 ---------- */
+
+function AuthForms({ onDone, health }) {
+  const [tab, setTab] = useState("login");
+  const [form, setForm] = useState({ email: "", password: "", nickname: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  function switchTab(next) {
+    setTab(next);
+    setError("");
+    setForm((f) => ({ ...f, password: "" }));   // 탭을 옮기면 비밀번호 칸은 비운다
+  }
+
+  async function submit(e) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const path = tab === "login" ? "/auth/login" : "/auth/signup";
+      const body = tab === "login"
+        ? { email: form.email, password: form.password }
+        : { email: form.email, password: form.password, nickname: form.nickname };
+      const data = await api(path, { method: "POST", body });
+      onDone(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "login"} onClick={() => switchTab("login")}>로그인</button>
+        <button role="tab" aria-selected={tab === "signup"} onClick={() => switchTab("signup")}>회원가입</button>
+      </div>
+
+      <div className="card">
+        <h2>{tab === "login" ? "다시 오셨네요" : "계정 만들기"}</h2>
+        <p className="sub">
+          {tab === "login"
+            ? "가입할 때 쓴 이메일과 비밀번호를 넣어 주세요."
+            : "이메일과 비밀번호만 있으면 됩니다. 닉네임은 나중에 바꿀 수 있어요."}
+        </p>
+
+        <Notice kind="bad">{error}</Notice>
+        {health && health.demo ? (
+          <Notice kind="warn">
+            데모 모드입니다 — 계정이 메모리에만 저장돼서 서버를 다시 켜면 사라집니다.
+            진짜로 쓰려면 <code>.env</code> 에 <code>DATABASE_URL</code> 을 넣으세요.
+          </Notice>
+        ) : null}
+
+        <form onSubmit={submit}>
+          <Field
+            label="이메일" type="email" value={form.email} onChange={set("email")}
+            placeholder="you@example.com" autoComplete="username" required disabled={busy}
+          />
+          {tab === "signup" ? (
+            <Field
+              label="닉네임 (선택)" type="text" value={form.nickname} onChange={set("nickname")}
+              placeholder="안 적으면 이메일 앞부분을 씁니다" maxLength={20} disabled={busy}
+            />
+          ) : null}
+          <Field
+            label="비밀번호" type="password" value={form.password} onChange={set("password")}
+            placeholder="********" required disabled={busy}
+            autoComplete={tab === "login" ? "current-password" : "new-password"}
+            hint={tab === "signup" ? "8자 이상 · 영문과 숫자를 모두 포함" : null}
+          />
+          <button className="btn wide" type="submit" disabled={busy}>
+            {busy ? "잠시만요…" : tab === "login" ? "로그인" : "가입하고 시작하기"}
+          </button>
+        </form>
+      </div>
+    </>
+  );
+}
+
+/* ---------- 로그인된 상태 ---------- */
+
+function Profile({ user, onUser, say }) {
+  const [nickname, setNickname] = useState(user.nickname);
+  const [busy, setBusy] = useState(false);
+  const changed = nickname.trim() !== user.nickname;
+
+  useEffect(() => setNickname(user.nickname), [user.nickname]);
+
+  async function save(e) {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const data = await api("/me", { method: "PATCH", body: { nickname } });
+      onUser(data.user);
+      say("ok", data.message);
+    } catch (err) { say("bad", err.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card">
+      <h2>내 정보</h2>
+      <p className="sub">이 화면은 액세스 토큰이 있어야 열립니다.</p>
+      <dl className="kv">
+        <dt>이메일</dt><dd className="mono">{user.email}</dd>
+        <dt>가입일</dt><dd>{when(user.createdAt)}</dd>
+        <dt>최근 로그인</dt><dd>{when(user.lastLoginAt)}</dd>
+      </dl>
+      <form onSubmit={save} style={{ marginTop: 18 }}>
+        <Field
+          label="닉네임" type="text" value={nickname} maxLength={20} disabled={busy}
+          onChange={(e) => setNickname(e.target.value)}
+        />
+        <button className="btn sm" type="submit" disabled={busy || !changed || !nickname.trim()}>
+          {busy ? "저장 중…" : "닉네임 저장"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function PasswordForm({ say }) {
+  const [form, setForm] = useState({ current: "", next: "", again: "" });
+  const [busy, setBusy] = useState(false);
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const mismatch = form.again && form.next !== form.again;
+
+  async function submit(e) {
+    e.preventDefault();
+    if (mismatch) return;
+    setBusy(true);
+    try {
+      const data = await api("/me/password", { method: "POST", body: { current: form.current, next: form.next } });
+      setForm({ current: "", next: "", again: "" });
+      say("ok", data.message);
+    } catch (err) { say("bad", err.message); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <div className="card">
+      <h2>비밀번호 바꾸기</h2>
+      <p className="sub">바꾸면 지금 이 기기만 남고 다른 기기는 모두 로그아웃됩니다.</p>
+      <form onSubmit={submit}>
+        <Field label="지금 비밀번호" type="password" value={form.current} onChange={set("current")}
+               autoComplete="current-password" required disabled={busy} />
+        <Field label="새 비밀번호" type="password" value={form.next} onChange={set("next")}
+               autoComplete="new-password" required disabled={busy}
+               hint="8자 이상 · 영문과 숫자를 모두 포함" />
+        <Field label="새 비밀번호 확인" type="password" value={form.again} onChange={set("again")}
+               autoComplete="new-password" required disabled={busy}
+               hint={mismatch ? "두 칸이 서로 다릅니다." : null} />
+        <button className="btn sm" type="submit" disabled={busy || mismatch || !form.current || !form.next}>
+          {busy ? "바꾸는 중…" : "비밀번호 바꾸기"}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function Sessions({ say, onLoggedOut }) {
+  const [sessions, setSessions] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try { setSessions((await api("/me/sessions")).sessions); }
+    catch (err) { say("bad", err.message); }
+  }, [say]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function kick(id) {
+    setBusy(true);
+    try {
+      const data = await api("/me/sessions/" + id, { method: "DELETE" });
+      say("ok", data.message);
+      await load();
+    } catch (err) { say("bad", err.message); }
+    finally { setBusy(false); }
+  }
+
+  async function kickAll() {
+    setBusy(true);
+    try {
+      await api("/me/sessions/logout-all", { method: "POST" });
+      onLoggedOut("모든 기기에서 로그아웃했어요");
+    } catch (err) { say("bad", err.message); setBusy(false); }
+  }
+
+  return (
+    <div className="card">
+      <h2>로그인된 기기</h2>
+      <p className="sub">리프레시 토큰이 살아 있는 기기 목록입니다. 끊으면 그 기기는 바로 로그아웃됩니다.</p>
+
+      {sessions === null ? <p className="sub">불러오는 중…</p> : null}
+      {sessions && sessions.length === 0 ? <p className="sub">없습니다.</p> : null}
+
+      {(sessions || []).map((s) => (
+        <div key={s.id} className={"sess" + (s.current ? " is-current" : "")}>
+          <div>
+            <div className="who">
+              {deviceName(s.userAgent)}
+              {s.current ? <span className="badge">지금 이 기기</span> : null}
+            </div>
+            <div className="when">
+              {s.ip ? s.ip + " · " : ""}마지막 사용 {ago(s.lastUsedAt)} · 만료 {when(s.expiresAt)}
+            </div>
+          </div>
+          {s.current ? null : (
+            <button className="btn danger sm" disabled={busy} onClick={() => kick(s.id)}>끊기</button>
+          )}
+        </div>
+      ))}
+
+      {sessions && sessions.length > 0 ? (
+        <div className="row" style={{ marginTop: 12 }}>
+          <button className="btn ghost sm" disabled={busy} onClick={load}>새로고침</button>
+          <button className="btn danger sm" disabled={busy} onClick={kickAll}>전부 로그아웃</button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** 지금 들고 있는 액세스 토큰을 뜯어서 보여준다 — JWT 가 뭔지 눈으로 보라고 넣은 패널. */
+function TokenPanel({ tick }) {
+  const parsed = accessToken ? peekJwt(accessToken) : null;
+  if (!parsed) return null;
+  const left = Math.max(0, parsed.payload.exp - Math.floor(Date.now() / 1000));
+  const mm = String(Math.floor(left / 60)).padStart(2, "0");
+  const ss = String(left % 60).padStart(2, "0");
+
+  return (
+    <div className="card">
+      <h2>지금 들고 있는 액세스 토큰</h2>
+      <p className="sub">
+        점으로 나뉜 세 토막입니다. 앞 둘은 누구나 열어볼 수 있고(암호화가 아닙니다),
+        마지막 서명만 서버 키로 만들 수 있습니다.
+      </p>
+      <pre className="token mono">
+        <span className="h">{accessToken.split(".")[0]}</span>
+        <span style={{ color: "#5b6b96" }}>.</span>
+        <span className="p">{accessToken.split(".")[1]}</span>
+        <span style={{ color: "#5b6b96" }}>.</span>
+        <span className="s">{accessToken.split(".")[2]}</span>
+      </pre>
+      <dl className="kv" style={{ marginTop: 14 }}>
+        <dt>헤더</dt><dd className="mono">{JSON.stringify(parsed.header)}</dd>
+        <dt>내용</dt><dd className="mono">{JSON.stringify(parsed.payload)}</dd>
+        <dt>남은 시간</dt>
+        <dd className="mono" style={{ color: left < 60 ? "var(--warn)" : "inherit" }}>
+          {mm}:{ss} {left === 0 ? "— 만료됨 (다음 요청 때 자동으로 새로 받습니다)" : ""}
+        </dd>
+      </dl>
+    </div>
+  );
+}
+
+/* ---------- 껍데기 ---------- */
+
+function App() {
+  const [user, setUser] = useState(null);
+  const [ready, setReady] = useState(false);
+  const [health, setHealth] = useState(null);
+  const [msg, setMsg] = useState(null);
+  const [tick, setTick] = useState(0);
+  const timer = useRef(null);
+
+  const say = useCallback((kind, text) => {
+    setMsg(text ? { kind, text } : null);
+    clearTimeout(timer.current);
+    if (text) timer.current = setTimeout(() => setMsg(null), 4000);
+  }, []);
+
+  // 처음 뜰 때: 쿠키가 살아 있으면 조용히 로그인 상태를 되살린다
+  useEffect(() => {
+    (async () => {
+      try { setHealth(await (await fetch("/api/health")).json()); } catch { /* 무시 */ }
+      const data = await refresh();
+      if (data) setUser(data.user);
+      setReady(true);
+    })();
+  }, []);
+
+  // 토큰 남은 시간 표시를 1초마다 다시 그린다
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  async function logout() {
+    try { await api("/auth/logout", { method: "POST" }); } catch { /* 실패해도 화면은 내린다 */ }
+    accessToken = null;
+    setUser(null);
+    say("ok", "로그아웃했어요");
+  }
+
+  function loggedOut(text) {
+    accessToken = null;
+    setUser(null);
+    say("ok", text);
+  }
+
+  if (!ready) {
+    return <div className="wrap"><p className="lead">불러오는 중…</p></div>;
+  }
+
+  return (
+    <div className="wrap">
+      <div className="eyebrow">week5 · jwt auth</div>
+      <h1>회원가입 · 로그인</h1>
+      <p className="lead">
+        액세스 토큰(JWT)으로 요청을 인증하고, httpOnly 쿠키에 담긴 리프레시 토큰으로 조용히 갱신합니다.
+      </p>
+
+      {msg ? <Notice kind={msg.kind}>{msg.text}</Notice> : null}
+
+      {health && health.auth && health.auth.secret !== "환경변수" ? (
+        <Notice kind="warn">
+          JWT_SECRET 이 설정되지 않아 임시 키로 돌고 있습니다 — 서버를 다시 켜면 로그인이 전부 풀립니다.
+        </Notice>
+      ) : null}
+
+      {!user ? (
+        <AuthForms health={health} onDone={(data) => { setUser(data.user); say("ok", data.message); }} />
+      ) : (
+        <>
+          <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div>
+              <h2 style={{ marginBottom: 2 }}>{user.nickname} 님</h2>
+              <p className="sub mono" style={{ margin: 0 }}>{user.email}</p>
+            </div>
+            <button className="btn ghost sm" onClick={logout}>로그아웃</button>
+          </div>
+
+          <Profile user={user} onUser={setUser} say={say} />
+          <TokenPanel tick={tick} />
+          <Sessions say={say} onLoggedOut={loggedOut} />
+          <PasswordForm say={say} />
+        </>
+      )}
+
+      <p className="foot">
+        {health && health.demo ? "데모 모드 (pg-mem · 메모리) · " : ""}
+        비밀번호는 <code>scrypt</code> 해시로만 저장됩니다 · 액세스 토큰은 메모리에만 둡니다
+      </p>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

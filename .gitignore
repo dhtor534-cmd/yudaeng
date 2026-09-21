@@ -8,3 +8,14 @@ node_modules/
 
 # 받아둔 스킬 저장소 원본 — 필요한 것만 .claude/skills/ 로 복사해 쓴다
 skills-main/
+
+# 리서치용으로 받아둔 영상·음성 원본 — 용량이 커서 커밋하지 않는다.
+# 자막(.srt)·대본(.txt)·설명(.description) 은 올린다.
+*.mp4
+*.m4a
+*.mp3
+*.webp
+
+# macOS 압축 해제 찌꺼기
+__MACOSX/
+.DS_Store
