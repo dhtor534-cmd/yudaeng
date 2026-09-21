@@ -225,9 +225,37 @@ const find = (state, name) => state.ingredients.find((i) => i.name === name);
     assert.strictEqual(res.status, 403);
   });
 
-  await test("상위 폴더로 빠져나가는 경로는 막힌다", async () => {
-    const res = await fetch(base + "/../../.gitignore");
-    assert.ok(res.status === 403 || res.status === 404, "상태 " + res.status);
+  await test("숨김 파일은 못 내려받는다 (.gitignore, .vercel/…)", async () => {
+    for (const p of ["/.gitignore", "/.vercel/project.json", "/../../.gitignore"]) {
+      const res = await fetch(base + p);
+      assert.strictEqual(res.status, 403, p + " → " + res.status);
+    }
+  });
+
+  await test("경로에 .. 를 넣어도 폴더 밖 파일은 안 나온다", async () => {
+    // new URL() 이 .. 를 먼저 정리하므로 /../../../x 는 /x 가 된다.
+    // 그래도 진짜 폴더 밖으로 못 나가는지, 날 소켓으로 보내서 확인한다.
+    const get = (path) => new Promise((resolve, reject) => {
+      const req = require("node:http").request(
+        { host: "127.0.0.1", port: server.address().port, path, method: "GET" },
+        (r) => {
+          let body = "";
+          r.on("data", (c) => (body += c));
+          r.on("end", () => resolve({ status: r.statusCode, body }));
+        }
+      );
+      req.on("error", reject);
+      req.end();
+    });
+
+    const dotted = await get("/../../../.gitignore");
+    assert.strictEqual(dotted.status, 403, "숨김 파일이 뚫림");
+
+    const pkg = await get("/../../../package.json");
+    if (pkg.status === 200) {
+      // 나왔다면 이 폴더의 것이어야 한다 (저장소 루트의 것이 아니라)
+      assert.strictEqual(JSON.parse(pkg.body).name, "week4-quest-fridge", "폴더 밖 파일이 나옴");
+    }
   });
 
   console.log(`\n통과 ${pass} · 실패 ${fail}`);

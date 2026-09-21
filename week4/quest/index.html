@@ -326,9 +326,22 @@ async function api(path, options) {
   let data = null;
   try { data = await res.json(); } catch { /* 본문이 JSON 이 아닐 수도 있다 */ }
   if (!res.ok) {
-    throw new Error((data && data.detail) || `서버 오류 (${res.status})`);
+    const err = new Error((data && data.detail) || `서버 오류 (${res.status})`);
+    err.status = res.status;
+    throw err;
   }
   return data;
+}
+
+/* fetch 자체가 실패하면(서버가 아예 없음) 오류에 표시를 남긴다 —
+   "서버가 없다" 와 "서버는 있는데 DB 가 없다" 는 안내가 달라야 해서 */
+async function apiSafe(path, options) {
+  try {
+    return await api(path, options);
+  } catch (e) {
+    if (e.status === undefined) e.offline = true;
+    throw e;
+  }
 }
 
 /* =========================================================
@@ -927,7 +940,7 @@ function App() {
   const [data, setData] = useState(null);      // { ingredients, recipes, shopping, cooks, options, db }
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);     // 쓰기 요청 진행 중
-  const [fatal, setFatal] = useState("");      // 첫 로딩 실패 (서버/DB 문제)
+  const [fatal, setFatal] = useState(null);    // 첫 로딩 실패 { text, offline }
   const [tab, setTab] = useState("fridge");
   const [editing, setEditing] = useState(null);
   const [openId, setOpenId] = useState(null);
@@ -946,11 +959,11 @@ function App() {
   /* ---- 첫 로딩 ---- */
   const load = useCallback(async () => {
     setLoading(true);
-    setFatal("");
+    setFatal(null);
     try {
-      setData(await api("/state"));
+      setData(await apiSafe("/state"));
     } catch (e) {
-      setFatal(e.message);
+      setFatal({ text: e.message, offline: !!e.offline });
     } finally {
       setLoading(false);
     }
@@ -1091,10 +1104,22 @@ function App() {
         {header}
         <div className="banner bad">
           <div>
-            <b>DB 에 연결하지 못했습니다.</b><br />
-            {fatal}<br />
-            이 앱은 <code>node server.js</code> 로 서버를 띄운 뒤 <code>localhost:8791</code> 로 열어야 동작합니다.
-            파일을 더블클릭해서 <code>file://</code> 로 열면 서버가 없어 이 화면이 나옵니다.
+            {fatal.offline ? (
+              <>
+                <b>서버에 연결하지 못했습니다.</b><br />
+                {fatal.text}<br />
+                이 앱은 서버가 있어야 동작합니다. 파일을 더블클릭해 <code>file://</code> 로 열면 이 화면이 나와요.
+                <br />로컬에서는 <code>node server.js</code> 로 띄운 뒤 <code>localhost:8791</code> 로 여세요.
+                DB 없이 화면만 보려면 <code>node dev-mem.js</code> → <code>localhost:8792</code>.
+              </>
+            ) : (
+              <>
+                <b>서버는 떠 있는데 데이터베이스에 연결하지 못했습니다.</b><br />
+                {fatal.text}<br />
+                배포본이라면 Vercel → Settings → Environment Variables 에 <code>DATABASE_URL</code> 을
+                (AI 를 쓰려면 <code>OPENAI_API_KEY</code> 도) 넣어 주세요. 로컬이라면 <code>.env</code> 를 확인하세요.
+              </>
+            )}
           </div>
           <button className="btn" onClick={load}>다시 시도</button>
         </div>

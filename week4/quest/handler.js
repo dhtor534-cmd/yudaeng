@@ -191,7 +191,11 @@ async function serveStatic(res, urlPath) {
   catch { return send(res, 400, "400 Bad Request", MIME[".html"]); }
   const file = path.resolve(ROOT, rel);
   if (!file.startsWith(ROOT)) return send(res, 403, "403 Forbidden", MIME[".html"]);
-  if (path.basename(file).startsWith(".env")) return send(res, 403, "403 Forbidden", MIME[".html"]);
+  // 숨김 파일·폴더는 통째로 막는다 (.env, .git, .vercel/project.json …).
+  // 이름 하나만 막으면 새 점파일이 생길 때마다 구멍이 난다.
+  if (path.relative(ROOT, file).split(/[\\/]/).some((seg) => seg.startsWith("."))) {
+    return send(res, 403, "403 Forbidden", MIME[".html"]);
+  }
   try {
     const body = await fsp.readFile(file);
     send(res, 200, body, MIME[path.extname(file).toLowerCase()] || "application/octet-stream");
